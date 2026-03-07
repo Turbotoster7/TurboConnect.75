@@ -1,0 +1,60 @@
+TARGET          Nokiaspotify_0xE0A04525.exe
+TARGETTYPE      exe
+UID             0x100039CE 0xE0A04525
+SECUREID        0xE0A04525
+
+EPOCSTACKSIZE   262144
+EPOCHEAPSIZE    0x20000 0x800000
+
+CAPABILITY      ReadUserData WriteUserData NetworkServices LocalServices UserEnvironment
+
+SOURCEPATH      ..\src
+SOURCE          Nokiaspotify.cpp
+SOURCE          NokiaspotifyApplication.cpp
+SOURCE          NokiaspotifyDocument.cpp
+SOURCE          NokiaspotifyAppUi.cpp
+SOURCE          NokiaspotifyAppView.cpp
+SOURCE          NokiaspotifyNetwork.cpp
+
+USERINCLUDE     ..\inc
+
+// Tylko standardowy include SDK - NIE dodawaj \epoc32\include\appfw (nie ma w S60 3rd FP2)
+SYSTEMINCLUDE   \epoc32\include
+
+LIBRARY         euser.lib
+LIBRARY         apparc.lib
+LIBRARY         cone.lib
+LIBRARY         eikcore.lib
+LIBRARY         eikcoctl.lib
+LIBRARY         eikctl.lib
+LIBRARY         avkon.lib
+LIBRARY         eiksrv.lib
+LIBRARY         eikdlg.lib
+// apgrdr.lib - GCCE na FP2 linkuje do ARMV5\LIB\apgrdr.dso (czesto brak); WINSCW tez.
+// StartDocument wylaczony w kodzie - odtwarzanie tylko przez MMF w aplikacji.
+LIBRARY         bafl.lib
+LIBRARY         estor.lib
+LIBRARY         efsrv.lib
+LIBRARY         ws32.lib
+LIBRARY         gdi.lib
+LIBRARY         bitgdi.lib
+LIBRARY         charconv.lib
+LIBRARY         mediaclientaudio.lib
+LIBRARY         esock.lib
+LIBRARY         insock.lib
+LIBRARY         commdb.lib
+
+LANG            01
+LANG            PL
+
+START RESOURCE  ..\src\Nokiaspotify_0xE0A04525.rss
+HEADER
+TARGET          Nokiaspotify_0xE0A04525
+TARGETPATH      resource\apps
+LANG            01
+LANG            PL
+END
+
+START RESOURCE  ..\src\Nokiaspotify_reg.rss
+TARGETPATH      \private\10003a3f\import\apps
+END

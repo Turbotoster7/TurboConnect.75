@@ -1,0 +1,55 @@
+# --- Python ---
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+music/*.mp3
+
+# --- Turboconnect: własne MP3 (tylko Ty wgrywasz; nie commituj) ---
+server/music_library/**
+!server/music_library/.gitkeep
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# --- Symbian / Carbide / ABLD ---
+Epoc32/
+[Bb]WINS/
+ABLD/
+abld/
+*.sis
+*.sisx
+*.app
+*.map
+*.sym
+*.fxc
+
+# Often regenerated from .rss (keep .rss in repo; drop if you version these on purpose)
+*.rsg
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# --- Optional: uncomment if you copy full Carbide workspace into repo ---
+# .metadata/
+# RemoteSystemsTempFiles/
