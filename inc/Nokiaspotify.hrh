@@ -1,0 +1,30 @@
+/*
+ ============================================================================
+ Name		: Nokiaspotify.hrh
+ Author	  : 
+ Copyright   : Your copyright notice
+ Description : This file contains declarations for constants of Nokiaspotify.
+ The file can be included in C++ or resource file.
+ ============================================================================
+ */
+#ifndef __NOKIASPOTIFY_HRH__
+#define __NOKIASPOTIFY_HRH__
+
+#define _UID3 0xE0A04525
+
+// Nokiaspotify enumerate command codes
+enum TNokiaspotifyIds
+	{
+	ECommand1 = 0x6001, // start value must not be 0
+	ECommand2,
+	EHelp,
+	ELogin,
+	EAbout,
+	EConnectInternet,
+	EPlaylistOpen,
+	EPlaylistRemoveTrack,
+	EPlaylistDelete,
+	ELibraryReindex
+	};
+
+#endif // __NOKIASPOTIFY_HRH__
