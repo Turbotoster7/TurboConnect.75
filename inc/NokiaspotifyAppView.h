@@ -87,3 +87,47 @@ private:
 	/**
 	 * ConstructL
 	 * 2nd phase constructor.
+	 * Perform the second phase construction of a
+	 * CNokiaspotifyAppView object.
+	 * @param aRect The rectangle this view will be drawn to.
+	 */
+	void ConstructL(const TRect& aRect);
+
+	/**
+	 * CNokiaspotifyAppView.
+	 * C++ default constructor.
+	 */
+	CNokiaspotifyAppView();
+
+	static TRect LoginButtonRect();
+	/** Layout-only rect (not drawn): outer bounds for intro text; use inner padding when drawing. */
+	static TRect IntroduceTextBox(const TRect& aClient, const TRect& aLoginButton);
+	static TSize ClassicRound();
+	static void LeafNameFromPath(const TDesC& aPath, TDes& aOut);
+	void ExecuteSelectedMenuItemL();
+	void SubmitInlineInputL();
+	TBool iLoginButtonDown;
+	TBool iLoginKeyFocus;
+	TBool iInlineInputActive;
+	TBool iInlineInputOnline;
+	TBool iPlaybackPanelVisible;
+	TBool iTrackListVisible;
+	TBool iNowPlayingVisible;
+	TBool iNowPlayingShuffle;
+	TInt iMenuSelection;
+	TInt iTrackSelection;
+	TInt iTrackCount;
+	TBuf<32> iInlinePrompt;
+	TBuf<96> iInlineInput;
+	TBuf<32> iPlaybackTitle;
+	TBuf<96> iPlaybackDetail;
+	TBuf<32> iNowPlayingTitle;
+	TBuf<96> iNowPlayingDetail;
+	TBuf<32> iNowPlayingStatus;
+	TBuf<32> iListTitle;
+	TBuf<160> iTrackItems[24];
+
+	};
+
+#endif // __NOKIASPOTIFYAPPVIEW_h__
+// End of File

@@ -1,0 +1,15 @@
+#ifndef TURBO_APPREG_RH
+#define TURBO_APPREG_RH
+
+// Minimalna definicja na RCOMP, gdy AppRegistry.h z SDK nie jest znajdowany.
+// Zgodna z typowym APP_REGISTRATION_INFO (S60 3rd).
+STRUCT APP_REGISTRATION_INFO
+{
+LTEXT app_file;
+LTEXT localisable_resource_file = "";
+LONG localisable_resource_id = 0;
+WORD hidden = 0;
+LONG newfile_screen_res_id = 0;
+}
+
+#endif
