@@ -226,3 +226,187 @@ void CNokiaspotifyAppView::Draw(const TRect& /*aRect*/) const
 					{
 					case 0: line.Copy(KMenu1); break;
 					case 1: line.Copy(KMenu2); break;
+					case 2: line.Copy(KMenu3); break;
+					case 3: line.Copy(KMenu4); break;
+					case 4: line.Copy(KMenu5); break;
+					case 5: line.Copy(KMenu6); break;
+					default: line.Copy(KMenu7); break;
+					}
+				}
+			gc.DrawText(line, TPoint(row.iTl.iX + 6, row.iTl.iY + 14));
+			}
+		gc.DiscardFont();
+		}
+
+	gc.UseFont(textFont);
+	gc.SetPenColor(TRgb(140, 170, 150));
+	if (iNowPlayingVisible)
+		{
+		gc.DrawText(KNowPlayingHelp1, TPoint(r.iTl.iX + 10, r.iBr.iY - 64));
+		gc.DrawText(KNowPlayingHelp2, TPoint(r.iTl.iX + 10, r.iBr.iY - 50));
+		}
+	else if (iTrackListVisible)
+		{
+		gc.DrawText(KListHint, TPoint(r.iTl.iX + 10, r.iBr.iY - 64));
+		}
+	else
+		{
+		gc.DrawText(KMenuHint, TPoint(r.iTl.iX + 10, r.iBr.iY - 64));
+		}
+	gc.DiscardFont();
+
+	if (iInlineInputActive)
+		{
+		TRect box(r.iTl.iX + 8, r.iTl.iY + 48, r.iBr.iX - 8, r.iTl.iY + 128);
+		gc.SetPenStyle(CGraphicsContext::ESolidPen);
+		gc.SetPenColor(TRgb(80, 220, 120));
+		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+		gc.SetBrushColor(TRgb(20, 20, 20));
+		gc.DrawRoundRect(box, ClassicRound());
+
+		const CFont* inputFont = CEikonEnv::Static()->LegendFont();
+		gc.UseFont(inputFont);
+		gc.SetPenColor(TRgb(255, 255, 255));
+		gc.DrawText(iInlinePrompt, TPoint(box.iTl.iX + 8, box.iTl.iY + 16));
+		gc.DrawText(iInlineInput, TPoint(box.iTl.iX + 8, box.iTl.iY + 34));
+		_LIT(KInputHelp1, "Enter=szukaj");
+		_LIT(KInputHelp2, "Backspace=kasuj, #=anuluj");
+		gc.SetPenColor(TRgb(180, 180, 180));
+		gc.DrawText(KInputHelp1, TPoint(box.iTl.iX + 8, box.iTl.iY + 54));
+		gc.DrawText(KInputHelp2, TPoint(box.iTl.iX + 8, box.iTl.iY + 68));
+		gc.DiscardFont();
+		}
+
+	if (iPlaybackPanelVisible)
+		{
+		TRect panel(r.iTl.iX + 8, r.iBr.iY - 56, r.iBr.iX - 8, r.iBr.iY - 8);
+		gc.SetPenStyle(CGraphicsContext::ESolidPen);
+		gc.SetPenColor(TRgb(30, 215, 96));
+		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+		gc.SetBrushColor(TRgb(12, 30, 18));
+		gc.DrawRoundRect(panel, ClassicRound());
+
+		gc.SetBrushColor(TRgb(30, 215, 96));
+		gc.DrawRect(TRect(panel.iTl.iX + 6, panel.iBr.iY - 18, panel.iTl.iX + 10, panel.iBr.iY - 8));
+		gc.DrawRect(TRect(panel.iTl.iX + 13, panel.iBr.iY - 24, panel.iTl.iX + 17, panel.iBr.iY - 8));
+		gc.DrawRect(TRect(panel.iTl.iX + 20, panel.iBr.iY - 15, panel.iTl.iX + 24, panel.iBr.iY - 8));
+
+		const CFont* panelFont = CEikonEnv::Static()->LegendFont();
+		gc.UseFont(panelFont);
+		gc.SetPenColor(TRgb(160, 255, 190));
+		gc.DrawText(iPlaybackTitle, TPoint(panel.iTl.iX + 30, panel.iTl.iY + 15));
+		gc.SetPenColor(TRgb(255, 255, 255));
+		gc.DrawText(iPlaybackDetail, TPoint(panel.iTl.iX + 30, panel.iTl.iY + 31));
+		gc.DiscardFont();
+		}
+
+	gc.SetPenStyle(CGraphicsContext::ENullPen);
+	}
+
+// -----------------------------------------------------------------------------
+// CNokiaspotifyAppView::SizeChanged()
+// Called by framework when the view size is changed.
+// -----------------------------------------------------------------------------
+//
+void CNokiaspotifyAppView::SizeChanged()
+	{
+	DrawNow();
+	}
+
+// -----------------------------------------------------------------------------
+// CNokiaspotifyAppView::HandlePointerEventL()
+// Called by framework to handle pointer touch events.
+// Note: although this method is compatible with earlier SDKs,
+// it will not be called in SDKs without Touch support.
+// -----------------------------------------------------------------------------
+//
+void CNokiaspotifyAppView::HandlePointerEventL(
+		const TPointerEvent& aPointerEvent)
+	{
+	CCoeControl::HandlePointerEventL(aPointerEvent);
+	}
+
+void CNokiaspotifyAppView::BeginInlineSearchInputL(TBool aOnline)
+	{
+	iInlineInputActive = ETrue;
+	iInlineInputOnline = aOnline;
+	iNowPlayingVisible = EFalse;
+	iInlineInput.Zero();
+	iPlaybackPanelVisible = EFalse;
+	iPlaybackTitle.Zero();
+	iPlaybackDetail.Zero();
+	if (aOnline)
+		{
+		iInlinePrompt.Copy(_L("Wpisz utwor online:"));
+		}
+	else
+		{
+		iInlinePrompt.Copy(_L("Wpisz utwor lokalnie:"));
+		}
+	DrawNow();
+	}
+
+void CNokiaspotifyAppView::ShowTrackListL(const RPointerArray<HBufC>& aTracks, const TDesC& aTitle)
+	{
+	iNowPlayingVisible = EFalse;
+	iTrackListVisible = ETrue;
+	iTrackCount = (aTracks.Count() < 24) ? aTracks.Count() : 24;
+	iTrackSelection = 0;
+	iListTitle.Copy(aTitle.Left(iListTitle.MaxLength()));
+	for (TInt i = 0; i < iTrackCount; ++i)
+		{
+		iTrackItems[i].Copy((*aTracks[i]).Left(iTrackItems[i].MaxLength()));
+		}
+	DrawNow();
+	}
+
+void CNokiaspotifyAppView::ShowHomeScreen()
+	{
+	iNowPlayingVisible = EFalse;
+	iTrackListVisible = EFalse;
+	iTrackCount = 0;
+	iTrackSelection = 0;
+	iListTitle.Zero();
+	DrawNow();
+	}
+
+void CNokiaspotifyAppView::SetPlaybackPanel(const TDesC& aTitle, const TDesC& aDetail)
+	{
+	iPlaybackPanelVisible = ETrue;
+	iPlaybackTitle.Copy(aTitle.Left(iPlaybackTitle.MaxLength()));
+	iPlaybackDetail.Copy(aDetail.Left(iPlaybackDetail.MaxLength()));
+	DrawNow();
+	}
+
+void CNokiaspotifyAppView::ClearPlaybackPanel()
+	{
+	iPlaybackPanelVisible = EFalse;
+	iPlaybackTitle.Zero();
+	iPlaybackDetail.Zero();
+	DrawNow();
+	}
+
+void CNokiaspotifyAppView::SetNowPlayingState(const TDesC& aTitle, const TDesC& aDetail, const TDesC& aStatus, TBool aShuffleEnabled)
+	{
+	iNowPlayingTitle.Copy(aTitle.Left(iNowPlayingTitle.MaxLength()));
+	iNowPlayingDetail.Copy(aDetail.Left(iNowPlayingDetail.MaxLength()));
+	iNowPlayingStatus.Copy(aStatus.Left(iNowPlayingStatus.MaxLength()));
+	iNowPlayingShuffle = aShuffleEnabled;
+	DrawNow();
+	}
+
+void CNokiaspotifyAppView::ShowNowPlayingScreen()
+	{
+	iNowPlayingVisible = ETrue;
+	iTrackListVisible = EFalse;
+	DrawNow();
+	}
+
+TBool CNokiaspotifyAppView::IsNowPlayingVisible() const
+	{
+	return iNowPlayingVisible;
+	}
+
+void CNokiaspotifyAppView::ExecuteSelectedMenuItemL()
+	{
+	CEikAppUi* ui = CEikonEnv::Static()->EikAppUi();
