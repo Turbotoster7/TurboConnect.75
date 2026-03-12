@@ -1,0 +1,16 @@
+; Domyslny SIS dla tego projektu (mmp ma COMPILER GCCE).
+; Sciezka exe: Epoc32\release\gcce\urel\
+
+&EN
+
+#{"TurboMusic"},(0xE0A04525),1,0,0
+
+%{"TurboMusic"}
+:"TurboMusic"
+
+"$(EPOCROOT)Epoc32\release\gcce\urel\Nokiaspotify_0xE0A04525.exe"-"!:\sys\bin\Nokiaspotify_0xE0A04525.exe"
+; Po LANG 01+PL w mmp: dwa pliki (telefon PL szuka .r27, fallback EN .r01). Jesli build da inna nazwe, dopasuj do epoc32\data\z\resource\apps\
+"$(EPOCROOT)Epoc32\data\z\resource\apps\Nokiaspotify_0xE0A04525.r01"-"!:\resource\apps\Nokiaspotify_0xE0A04525.r01"
+"$(EPOCROOT)Epoc32\data\z\resource\apps\Nokiaspotify_0xE0A04525.r27"-"!:\resource\apps\Nokiaspotify_0xE0A04525.r27"
+"$(EPOCROOT)Epoc32\data\z\private\10003a3f\import\apps\Nokiaspotify_reg.r01"-"!:\private\10003a3f\import\apps\Nokiaspotify_reg.r01"
+"$(EPOCROOT)Epoc32\data\z\private\10003a3f\import\apps\Nokiaspotify_reg.r27"-"!:\private\10003a3f\import\apps\Nokiaspotify_reg.r27"

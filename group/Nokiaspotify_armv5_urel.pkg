@@ -1,0 +1,15 @@
+; TurboMusic - SIS gdy toolchain = RVCT ARMV5 UREL (exe w Epoc32\release\armv5\urel\).
+; Domyslnie Carbide + GCCE daje exe w gcce\urel - wtedy uzyj Nokiaspotify_gcce_urel.pkg
+
+&EN
+
+#{"TurboMusic"},(0xE0A04525),1,0,0
+
+%{"TurboMusic"}
+:"TurboMusic"
+
+"$(EPOCROOT)Epoc32\release\armv5\urel\Nokiaspotify_0xE0A04525.exe"-"!:\sys\bin\Nokiaspotify_0xE0A04525.exe"
+"$(EPOCROOT)Epoc32\data\z\resource\apps\Nokiaspotify_0xE0A04525.r01"-"!:\resource\apps\Nokiaspotify_0xE0A04525.r01"
+"$(EPOCROOT)Epoc32\data\z\resource\apps\Nokiaspotify_0xE0A04525.r27"-"!:\resource\apps\Nokiaspotify_0xE0A04525.r27"
+"$(EPOCROOT)Epoc32\data\z\private\10003a3f\import\apps\Nokiaspotify_reg.r01"-"!:\private\10003a3f\import\apps\Nokiaspotify_reg.r01"
+"$(EPOCROOT)Epoc32\data\z\private\10003a3f\import\apps\Nokiaspotify_reg.r27"-"!:\private\10003a3f\import\apps\Nokiaspotify_reg.r27"

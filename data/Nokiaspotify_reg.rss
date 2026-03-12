@@ -1,0 +1,6 @@
+#include "TurboAppReg.rh"
+
+RESOURCE APP_REGISTRATION_INFO
+{
+app_file = "Nokiaspotify_0xE0A04525";
+}

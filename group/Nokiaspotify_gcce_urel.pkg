@@ -1,0 +1,17 @@
+; TurboMusic - SIS dla telefonu, gdy build = GCCE UREL (typowe w Carbide / FP2 bez RVCT).
+; Exe jest w: Epoc32\release\gcce\urel\
+; Jesli uzywasz RVCT i exe jest w armv5\urel - skopiuj ten plik jako Nokiaspotify_armv5_urel.pkg
+; i zamien wszystkie "gcce" na "armv5".
+
+&EN
+
+#{"TurboMusic"},(0xE0A04525),1,0,0
+
+%{"TurboMusic"}
+:"TurboMusic"
+
+"$(EPOCROOT)Epoc32\release\gcce\urel\Nokiaspotify_0xE0A04525.exe"-"!:\sys\bin\Nokiaspotify_0xE0A04525.exe"
+"$(EPOCROOT)Epoc32\data\z\resource\apps\Nokiaspotify_0xE0A04525.r01"-"!:\resource\apps\Nokiaspotify_0xE0A04525.r01"
+"$(EPOCROOT)Epoc32\data\z\resource\apps\Nokiaspotify_0xE0A04525.r27"-"!:\resource\apps\Nokiaspotify_0xE0A04525.r27"
+"$(EPOCROOT)Epoc32\data\z\private\10003a3f\import\apps\Nokiaspotify_reg.r01"-"!:\private\10003a3f\import\apps\Nokiaspotify_reg.r01"
+"$(EPOCROOT)Epoc32\data\z\private\10003a3f\import\apps\Nokiaspotify_reg.r27"-"!:\private\10003a3f\import\apps\Nokiaspotify_reg.r27"

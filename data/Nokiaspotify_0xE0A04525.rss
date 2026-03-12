@@ -1,0 +1,40 @@
+NAME NOKIASPOT
+
+#include <eikon.rh>
+#include <avkon.rh>
+#include <avkon.rsg>
+#include "Nokiaspotify.hrh"
+
+RESOURCE RSS_SIGNATURE { }
+
+RESOURCE TBUF r_default_document_name { buf=""; }
+
+RESOURCE EIK_APP_INFO
+{
+menubar = r_nokiaspotify_menubar;
+cba = R_AVKON_SOFTKEYS_OPTIONS_BACK;
+}
+
+RESOURCE MENU_BAR r_nokiaspotify_menubar
+{
+titles =
+{
+MENU_TITLE { menu_pane = r_nokiaspotify_menu; txt = "TurboMusic"; }
+};
+}
+
+RESOURCE MENU_PANE r_nokiaspotify_menu
+{
+items =
+{
+MENU_ITEM { command = ECommand1; txt = "Szukaj"; },
+MENU_ITEM { command = ECommand2; txt = "Playlista"; },
+MENU_ITEM { command = EHelp; txt = "Playlisty"; },
+MENU_ITEM { command = ELogin; txt = "Internet"; },
+MENU_ITEM { command = EAbout; txt = "Dodaj do PL"; },
+MENU_ITEM { command = EPlaylistOpen; txt = "Otworz PL"; },
+MENU_ITEM { command = EPlaylistRemoveTrack; txt = "Usun z PL"; },
+MENU_ITEM { command = EPlaylistDelete; txt = "Kasuj PL"; },
+MENU_ITEM { command = ELibraryReindex; txt = "Reindex"; }
+};
+}
