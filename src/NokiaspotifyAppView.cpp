@@ -410,3 +410,120 @@ TBool CNokiaspotifyAppView::IsNowPlayingVisible() const
 void CNokiaspotifyAppView::ExecuteSelectedMenuItemL()
 	{
 	CEikAppUi* ui = CEikonEnv::Static()->EikAppUi();
+	CNokiaspotifyAppUi* appUi = STATIC_CAST(CNokiaspotifyAppUi*, ui);
+	switch (iMenuSelection)
+		{
+		case 0:
+			appUi->HandleQuickSearchFromViewL();
+			break;
+		case 1:
+			appUi->HandleQuickShowTrackListFromViewL();
+			break;
+		case 2:
+			appUi->HandleQuickToggleInternetFromViewL();
+			break;
+		case 3:
+			appUi->HandleQuickOnlineSearchFromViewL();
+			break;
+		case 4:
+			appUi->HandleQuickReindexLibraryFromViewL();
+			break;
+		case 5:
+			appUi->HandleQuickCleanCacheFromViewL();
+			break;
+		default:
+			appUi->HandleQuickPingFromViewL();
+			break;
+		}
+	}
+
+void CNokiaspotifyAppView::SubmitInlineInputL()
+	{
+	if (!iInlineInputActive)
+		{
+		return;
+		}
+
+	TBuf<96> query;
+	query.Copy(iInlineInput);
+	const TBool online = iInlineInputOnline;
+	iInlineInputActive = EFalse;
+	iInlineInputOnline = EFalse;
+	iInlineInput.Zero();
+	DrawNow();
+
+	CEikAppUi* ui = CEikonEnv::Static()->EikAppUi();
+	CNokiaspotifyAppUi* appUi = STATIC_CAST(CNokiaspotifyAppUi*, ui);
+	if (online)
+		{
+		appUi->HandleInlineOnlineSearchQueryFromViewL(query);
+		}
+	else
+		{
+		appUi->HandleInlineSearchQueryFromViewL(query);
+		}
+	}
+
+TKeyResponse CNokiaspotifyAppView::OfferKeyEventL(
+		const TKeyEvent& aKeyEvent,
+		TEventCode aType)
+	{
+	if (aType == EEventKey && aKeyEvent.iRepeats == 0)
+		{
+		const TInt c = static_cast<TInt>(aKeyEvent.iCode);
+		CEikAppUi* ui = CEikonEnv::Static()->EikAppUi();
+		CNokiaspotifyAppUi* appUi = STATIC_CAST(CNokiaspotifyAppUi*, ui);
+		if (iInlineInputActive)
+			{
+			if (c == EKeyEnter || c == EStdKeyDevice3)
+				{
+				SubmitInlineInputL();
+				return EKeyWasConsumed;
+				}
+			if (c == EKeyBackspace)
+				{
+				if (iInlineInput.Length() > 0)
+					{
+					iInlineInput.SetLength(iInlineInput.Length() - 1);
+					DrawNow();
+					}
+				return EKeyWasConsumed;
+				}
+			if (c == '#')
+				{
+				iInlineInputActive = EFalse;
+				iInlineInputOnline = EFalse;
+				iInlineInput.Zero();
+				DrawNow();
+				return EKeyWasConsumed;
+				}
+			if (c >= 32 && c <= 126 && iInlineInput.Length() < iInlineInput.MaxLength())
+				{
+				iInlineInput.Append((TText)c);
+				DrawNow();
+				return EKeyWasConsumed;
+				}
+			return EKeyWasConsumed;
+			}
+		if (iNowPlayingVisible)
+			{
+			if (c == '0' || c == EKeyBackspace)
+				{
+				ShowHomeScreen();
+				return EKeyWasConsumed;
+				}
+			if (c == '4')
+				{
+				appUi->HandlePlaybackPrevFromViewL();
+				return EKeyWasConsumed;
+				}
+			if (c == '5' || c == EStdKeyDevice3 || c == EKeyEnter)
+				{
+				appUi->HandlePlaybackToggleFromViewL();
+				return EKeyWasConsumed;
+				}
+			if (c == '6')
+				{
+				appUi->HandlePlaybackNextFromViewL();
+				return EKeyWasConsumed;
+				}
