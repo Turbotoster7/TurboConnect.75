@@ -527,3 +527,101 @@ TKeyResponse CNokiaspotifyAppView::OfferKeyEventL(
 				appUi->HandlePlaybackNextFromViewL();
 				return EKeyWasConsumed;
 				}
+			if (c == '7')
+				{
+				appUi->HandlePlaybackShuffleFromViewL();
+				return EKeyWasConsumed;
+				}
+			return EKeyWasConsumed;
+			}
+		if (iTrackListVisible)
+			{
+			if ((c == EKeyUpArrow || c == '2') && iTrackSelection > 0)
+				{
+				--iTrackSelection;
+				DrawNow();
+				return EKeyWasConsumed;
+				}
+			if ((c == EKeyDownArrow || c == '8') && iTrackSelection + 1 < iTrackCount)
+				{
+				++iTrackSelection;
+				DrawNow();
+				return EKeyWasConsumed;
+				}
+			if (c == EKeyBackspace)
+				{
+				ShowHomeScreen();
+				return EKeyWasConsumed;
+				}
+			if (c == '0')
+				{
+				appUi->HandleOpenNowPlayingFromViewL();
+				return EKeyWasConsumed;
+				}
+			if ((c == EKeyEnter || c == EStdKeyDevice3) && iTrackCount > 0)
+				{
+				appUi->HandleTrackChosenFromViewL(iTrackSelection);
+				return EKeyWasConsumed;
+				}
+			if (c == '5' && iTrackCount > 0)
+				{
+				appUi->HandleSaveTrackFromViewL(iTrackSelection);
+				return EKeyWasConsumed;
+				}
+			if (c == '9' && iTrackCount > 0)
+				{
+				appUi->HandleDeleteTrackFromViewL(iTrackSelection);
+				return EKeyWasConsumed;
+				}
+			}
+		switch (c)
+			{
+			case '0':
+				appUi->HandleOpenNowPlayingFromViewL();
+				return EKeyWasConsumed;
+			case '1':
+				appUi->HandleQuickSearchFromViewL();
+				return EKeyWasConsumed;
+			case '2':
+				appUi->HandleQuickShowTrackListFromViewL();
+				return EKeyWasConsumed;
+			case '3':
+				appUi->HandleQuickToggleInternetFromViewL();
+				return EKeyWasConsumed;
+			case '4':
+				appUi->HandleQuickOnlineSearchFromViewL();
+				return EKeyWasConsumed;
+			case '5':
+				appUi->HandleQuickReindexLibraryFromViewL();
+				return EKeyWasConsumed;
+			case '6':
+				appUi->HandleQuickCleanCacheFromViewL();
+				return EKeyWasConsumed;
+			case '7':
+				appUi->HandleQuickPingFromViewL();
+				return EKeyWasConsumed;
+			default:
+				break;
+			}
+		if ((c == EKeyUpArrow || c == '2') && iMenuSelection > 0)
+			{
+			--iMenuSelection;
+			DrawNow();
+			return EKeyWasConsumed;
+			}
+		if ((c == EKeyDownArrow || c == '8') && iMenuSelection < 6)
+			{
+			++iMenuSelection;
+			DrawNow();
+			return EKeyWasConsumed;
+			}
+		if (c == EKeyEnter || c == EStdKeyDevice3)
+			{
+			ExecuteSelectedMenuItemL();
+			return EKeyWasConsumed;
+			}
+		}
+	return CCoeControl::OfferKeyEventL(aKeyEvent, aType);
+	}
+
+// End of File
