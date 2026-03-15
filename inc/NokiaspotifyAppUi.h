@@ -116,3 +116,58 @@ private:
 	void ShowCurrentTrackListL(const TDesC& aTitle);
 	void ResetCurrentTrackList();
 	void PlayLocalFileL(const TDesC& aPath, TBool aFromInternet, const TDesC& aDisplayName);
+	void DownloadRemoteTrackL(const TDesC& aRelativeUrl, const TDesC& aFileName);
+	void CleanCacheL();
+	void ShowOperationErrorL(TInt aErr);
+	void ResetPlaybackQueue();
+	void CopyCurrentTracksToPlaybackQueueL();
+	void PlayQueueIndexL(TInt aIndex);
+	void UpdatePlaybackUi();
+	void OpenNowPlayingScreenL();
+	void StopPlayback();
+	void ToggleShuffle();
+	TInt ResolveNextQueueIndex() const;
+	TInt ResolvePrevQueueIndex() const;
+	void CreatePlaylistL();
+	void AddTrackToPlaylistL();
+	void ShowPlaylistsL();
+	void ShowPlaylistByNameL();
+	void RemoveTrackFromPlaylistL();
+	void DeletePlaylistL();
+	void RebuildLocalLibraryIndexL();
+	void ToggleInternetConnectionL();
+	void ShowAppStatusL();
+	void ResolveDataDir(TDes& aOut);
+	void OpenOnlineSearchL(const TDesC& aQuery);
+	void PingServerL();
+
+private:
+	// Data
+
+	/**
+	 * The application view
+	 * Owned by CNokiaspotifyAppUi
+	 */
+	CNokiaspotifyAppView* iAppView;
+	CTurboMusicCacheManager* iCacheManager;
+	CNokiaspotifyNetwork* iNetwork;
+	CTurboMusicService* iMusicService;
+	RPointerArray<CTurboTrackEntry> iCurrentTracks;
+	RPointerArray<CTurboTrackEntry> iPlaybackQueue;
+	TBuf<32> iCurrentTrackListTitle;
+	CMdaAudioPlayerUtility* iAudioPlayer;
+	TInt iPlaybackIndex;
+	TBool iAudioReady;
+	TBool iAudioPlaying;
+	TBool iShuffleEnabled;
+	TBool iPendingAutoPlay;
+	TBool iStopRequested;
+	TBool iCurrentTrackFromInternet;
+	TBuf<96> iCurrentPlaybackName;
+	TFileName iPendingAudioPath;
+	TBuf<96> iPendingPlaybackName;
+
+	};
+
+#endif // __NOKIASPOTIFYAPPUI_h__
+// End of File
