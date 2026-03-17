@@ -221,3 +221,182 @@ static void AppendOwnedBufFrom8L(RPointerArray<HBufC>& aOut, const TDesC8& aText
 		}
 	AppendOwnedBufL(aOut, temp);
 	}
+
+static void ExtractTrackLinesFromHtml8L(const TDesC8& aHtml, RPointerArray<HBufC>& aOut, TInt aLimit)
+	{
+	TInt pos = 0;
+	while (pos < aHtml.Length() && aOut.Count() < aLimit)
+		{
+		TInt end = aHtml.Mid(pos).Locate('\n');
+		if (end < 0)
+			{
+			end = aHtml.Length() - pos;
+			}
+		TPtrC8 line = aHtml.Mid(pos, end);
+		while (line.Length() > 0 && (line[0] == ' ' || line[0] == '\t' || line[0] == '\r'))
+			{
+			line.Set(line.Mid(1));
+			}
+		while (line.Length() > 0)
+			{
+			const TUint c = line[line.Length() - 1];
+			if (c == ' ' || c == '\t' || c == '\r')
+				{
+				line.Set(line.Left(line.Length() - 1));
+				}
+			else
+				{
+				break;
+				}
+			}
+		if (IsLikelyTrackLine8(line))
+			{
+			AppendOwnedBufFrom8L(aOut, line);
+			}
+		pos += end + 1;
+		}
+	}
+
+static TPtrC8 HttpBodyFromResponse8(const TDesC8& aResp)
+	{
+	const TInt bodyPos = aResp.Find(_L8("\r\n\r\n"));
+	return (bodyPos >= 0) ? aResp.Mid(bodyPos + 4) : aResp.Left(aResp.Length());
+	}
+
+static TBool ExtractFirstDownloadLinkFromHtml8(const TDesC8& aHtml, TDes& aUrlOut)
+	{
+	const TInt pos = aHtml.Find(_L8("/library/file/"));
+	if (pos < 0)
+		{
+		return EFalse;
+		}
+	TPtrC8 rest = aHtml.Mid(pos);
+	TInt end = rest.Locate('"');
+	if (end < 0)
+		{
+		end = rest.Locate('\'');
+		}
+	if (end < 0)
+		{
+		end = rest.Length();
+		}
+	CopyAscii8ToDes(aUrlOut, rest.Left(end));
+	return aUrlOut.Length() > 0;
+	}
+
+static HBufC8* HttpGetSmallResponseL(const TDesC& aHost, const TDesC& aPath, TInt aMaxBytes)
+	{
+	RSocketServ ss;
+	User::LeaveIfError(ss.Connect());
+	CleanupClosePushL(ss);
+
+	RHostResolver resolver;
+	User::LeaveIfError(resolver.Open(ss, KAfInet, KProtocolInetUdp));
+	CleanupClosePushL(resolver);
+	TNameEntry nameEntry;
+	User::LeaveIfError(resolver.GetByName(aHost, nameEntry));
+	TInetAddr addr = TInetAddr::Cast(nameEntry().iAddr);
+	addr.SetPort(80);
+
+	RSocket sock;
+	User::LeaveIfError(sock.Open(ss, KAfInet, KSockStream, KProtocolInetTcp));
+	CleanupClosePushL(sock);
+	TRequestStatus st;
+	sock.Connect(addr, st);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	HBufC8* path8 = ToAscii8LC(aPath);
+	HBufC8* req = HBufC8::NewLC(path8->Length() + 128);
+	req->Des().Copy(_L8("GET "));
+	req->Des().Append(*path8);
+	req->Des().Append(_L8(" HTTP/1.0\r\nHost: turboconect.pl\r\nConnection: close\r\n\r\n"));
+
+	sock.Write(req->Des(), st);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	HBufC8* resp8 = HBufC8::NewLC(aMaxBytes);
+	TPtr8 resp = resp8->Des();
+	for (;;)
+		{
+		TBuf8<1024> chunk;
+		TSockXfrLength len;
+		sock.RecvOneOrMore(chunk, 0, st, len);
+		User::WaitForRequest(st);
+		if (st.Int() == KErrEof || chunk.Length() == 0)
+			{
+			break;
+			}
+		User::LeaveIfError(st.Int());
+		if (resp.Length() + chunk.Length() > resp.MaxLength())
+			{
+			break;
+			}
+		resp.Append(chunk);
+		}
+
+	CleanupStack::Pop(resp8);
+	CleanupStack::PopAndDestroy(req);
+	CleanupStack::PopAndDestroy(path8);
+	CleanupStack::PopAndDestroy(&sock);
+	CleanupStack::PopAndDestroy(&resolver);
+	CleanupStack::PopAndDestroy(&ss);
+	return resp8;
+	}
+
+static void ExtractTrackLinesFromHtmlL(const TDesC& aHtml, RPointerArray<HBufC>& aOut, TInt aLimit)
+	{
+	TInt pos = 0;
+	while (pos < aHtml.Length() && aOut.Count() < aLimit)
+		{
+		TInt end = aHtml.Mid(pos).Locate('\n');
+		if (end < 0)
+			{
+			end = aHtml.Length() - pos;
+			}
+		TPtrC line = aHtml.Mid(pos, end);
+		TrimAsciiLine(line);
+		if (IsLikelyTrackLine(line))
+			{
+			AppendOwnedBufL(aOut, line);
+			}
+		pos += end + 1;
+		}
+	}
+
+static TBool FirstTrackNameL(RFs& aFs, TDes& aOut)
+	{
+	CDir* dir = NULL;
+	TFileName pattern(KMusicDirE);
+	pattern.Append(_L("*.mp3"));
+	if (aFs.GetDir(pattern, KEntryAttNormal, ESortByName, dir) == KErrNone && dir && dir->Count() > 0)
+		{
+		aOut.Copy((*dir)[0].iName);
+		delete dir;
+		return ETrue;
+		}
+	delete dir;
+	dir = NULL;
+	TFileName pattern2(KMusicDirC);
+	pattern2.Append(_L("*.mp3"));
+	if (aFs.GetDir(pattern2, KEntryAttNormal, ESortByName, dir) == KErrNone && dir && dir->Count() > 0)
+		{
+		aOut.Copy((*dir)[0].iName);
+		delete dir;
+		return ETrue;
+		}
+	delete dir;
+	return EFalse;
+	}
+
+static void EnsureFolderL(RFs& aFs, const TDesC& aFolder)
+	{
+	const TInt err = aFs.MkDirAll(aFolder);
+	if (err != KErrNone && err != KErrAlreadyExists)
+		{
+		User::Leave(err);
+		}
+	}
+
+static void CopyFileSimpleL(RFs& aFs, const TDesC& aSource, const TDesC& aTarget)
