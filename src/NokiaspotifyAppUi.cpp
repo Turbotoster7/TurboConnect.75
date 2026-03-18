@@ -576,3 +576,103 @@ static TBool FindFirstMusicFileInDirL(RFs& aFs, const TDesC& aDir, const TDesC& 
 			{
 			const TEntry& e = (*mp3)[i];
 			if (aQuery.Length() == 0 || e.iName.FindF(aQuery) >= 0)
+				{
+				aOut.Copy(aDir);
+				aOut.Append(e.iName);
+				CleanupStack::PopAndDestroy(mp3);
+				return ETrue;
+				}
+			}
+		CleanupStack::PopAndDestroy(mp3);
+		}
+
+	CDir* m4a = NULL;
+	TFileName m4aPattern(aDir);
+	m4aPattern.Append(_L("*.m4a"));
+	if (aFs.GetDir(m4aPattern, KEntryAttNormal, ESortByName, m4a) == KErrNone)
+		{
+		CleanupStack::PushL(m4a);
+		for (TInt i = 0; i < m4a->Count(); ++i)
+			{
+			const TEntry& e = (*m4a)[i];
+			if (aQuery.Length() == 0 || e.iName.FindF(aQuery) >= 0)
+				{
+				aOut.Copy(aDir);
+				aOut.Append(e.iName);
+				CleanupStack::PopAndDestroy(m4a);
+				return ETrue;
+				}
+			}
+		CleanupStack::PopAndDestroy(m4a);
+		}
+	return EFalse;
+	}
+
+static void AppendMusicPathsInDirL(RFs& aFs, const TDesC& aDir, RPointerArray<HBufC>& aOut)
+	{
+	CDir* mp3 = NULL;
+	TFileName mp3Pattern(aDir);
+	mp3Pattern.Append(_L("*.mp3"));
+	if (aFs.GetDir(mp3Pattern, KEntryAttNormal, ESortByName, mp3) == KErrNone)
+		{
+		CleanupStack::PushL(mp3);
+		for (TInt i = 0; i < mp3->Count() && aOut.Count() < 24; ++i)
+			{
+			TFileName path(aDir);
+			path.Append((*mp3)[i].iName);
+			AppendOwnedBufL(aOut, path);
+			}
+		CleanupStack::PopAndDestroy(mp3);
+		}
+
+	CDir* m4a = NULL;
+	TFileName m4aPattern(aDir);
+	m4aPattern.Append(_L("*.m4a"));
+	if (aFs.GetDir(m4aPattern, KEntryAttNormal, ESortByName, m4a) == KErrNone)
+		{
+		CleanupStack::PushL(m4a);
+		for (TInt i = 0; i < m4a->Count() && aOut.Count() < 24; ++i)
+			{
+			TFileName path(aDir);
+			path.Append((*m4a)[i].iName);
+			AppendOwnedBufL(aOut, path);
+			}
+		CleanupStack::PopAndDestroy(m4a);
+		}
+	}
+
+static void CopyAscii8ToDes(TDes& aOut, const TDesC8& aIn)
+	{
+	aOut.Zero();
+	const TInt max = (aIn.Length() < aOut.MaxLength()) ? aIn.Length() : aOut.MaxLength();
+	for (TInt i = 0; i < max; ++i)
+		{
+		aOut.Append((TText)aIn[i]);
+		}
+	}
+
+static void SanitizeFileName(TDes& aName)
+	{
+	for (TInt i = 0; i < aName.Length(); ++i)
+		{
+		const TText ch = aName[i];
+		if (ch < 32 || ch == '\\' || ch == '/' || ch == ':' || ch == '*' || ch == '?' || ch == '"' || ch == '<' || ch == '>' || ch == '|')
+			{
+			aName[i] = '_';
+			}
+		}
+	}
+
+static void ResolveMusicDirL(RFs& aFs, TDes& aOut)
+	{
+	TDriveInfo info;
+	if (aFs.Drive(info, EDriveE) == KErrNone && info.iType != EMediaNotPresent)
+		{
+		aOut.Copy(KTurboMusicDirE);
+		}
+	else
+		{
+		aOut.Copy(KTurboMusicDirC);
+		}
+	}
+
