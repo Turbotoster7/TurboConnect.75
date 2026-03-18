@@ -1171,3 +1171,98 @@ void CTurboMusicService::SearchHybridL(const TDesC& aQuery, RPointerArray<CTurbo
 	AppendLocalMatchesInDirL(fs, KTurboMusicDirC, aQuery, ETrue, aOut, KTrackListMax);
 	CleanupStack::PopAndDestroy(&fs);
 	if (aQuery.Length() > 0 && aOut.Count() == 0)
+		{
+		AppendRemoteSearchResultsL(aQuery, aOut, KOnlineSearchMaxResults);
+		}
+	}
+
+void CTurboMusicService::SearchOnlineOnlyL(const TDesC& aQuery, RPointerArray<CTurboTrackEntry>& aOut)
+	{
+	AppendRemoteSearchResultsL(aQuery, aOut, KOnlineSearchMaxResults);
+	}
+
+void CTurboMusicService::ListLibraryL(RPointerArray<CTurboTrackEntry>& aOut)
+	{
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	AppendAllInDirL(fs, iCacheManager.CacheDir(), EFalse, aOut, KTrackListMax);
+	AppendAllInDirL(fs, KMusicDirE, ETrue, aOut, KTrackListMax);
+	AppendAllInDirL(fs, KMusicDirC, ETrue, aOut, KTrackListMax);
+	AppendAllInDirL(fs, KTurboMusicDirE, ETrue, aOut, KTrackListMax);
+	AppendAllInDirL(fs, KTurboMusicDirC, ETrue, aOut, KTrackListMax);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CTurboMusicService::ResolvePermanentMusicDirL(RFs& aFs, TDes& aOut)
+	{
+	ResolveMusicDirL(aFs, aOut);
+	}
+
+void CTurboMusicService::DownloadToCacheL(CTurboTrackEntry& aEntry, TDes& aOutPath)
+	{
+	if (!aEntry.iRemoteUrl)
+		{
+		User::Leave(KErrNotFound);
+		}
+	_LIT(KHost, "turboconect.pl");
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	const TDesC& cacheDir = iCacheManager.CacheDir();
+	EnsureFolderL(fs, cacheDir);
+
+	TBuf<128> safeName;
+	if (aEntry.iFileName && aEntry.iFileName->Length() > 0)
+		{
+		safeName.Copy(aEntry.iFileName->Left(safeName.MaxLength()));
+		}
+	else
+		{
+		safeName.Copy(_L("track.mp3"));
+		}
+	SanitizeFileName(safeName);
+
+	TFileName target(cacheDir);
+	target.Append(safeName);
+	TEntry existing;
+	if (fs.Entry(target, existing) == KErrNone)
+		{
+		aOutPath.Copy(target);
+		CleanupStack::PopAndDestroy(&fs);
+		return;
+		}
+
+	RFile outFile;
+	User::LeaveIfError(outFile.Replace(fs, target, EFileWrite | EFileShareExclusive));
+	CleanupClosePushL(outFile);
+
+	RSocketServ ss;
+	User::LeaveIfError(ss.Connect());
+	CleanupClosePushL(ss);
+	RHostResolver resolver;
+	User::LeaveIfError(resolver.Open(ss, KAfInet, KProtocolInetUdp));
+	CleanupClosePushL(resolver);
+	TNameEntry nameEntry;
+	User::LeaveIfError(resolver.GetByName(KHost, nameEntry));
+	TInetAddr addr = TInetAddr::Cast(nameEntry().iAddr);
+	addr.SetPort(80);
+	RSocket sock;
+	User::LeaveIfError(sock.Open(ss, KAfInet, KSockStream, KProtocolInetTcp));
+	CleanupClosePushL(sock);
+	TRequestStatus st;
+	sock.Connect(addr, st);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	HBufC8* path8 = ToAscii8LC(*aEntry.iRemoteUrl);
+	HBufC8* req = HBufC8::NewLC(path8->Length() + 128);
+	req->Des().Copy(_L8("GET "));
+	req->Des().Append(*path8);
+	req->Des().Append(_L8(" HTTP/1.0\r\nHost: turboconect.pl\r\nConnection: close\r\n\r\n"));
+	sock.Write(req->Des(), st);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	HBufC8* headerBuf = HBufC8::NewLC(4096);
+	TPtr8 header = headerBuf->Des();
