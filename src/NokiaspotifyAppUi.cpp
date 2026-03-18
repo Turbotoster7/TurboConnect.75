@@ -874,3 +874,198 @@ public:
 		TBool aPermanent,
 		TBool aOnlineOnly)
 		{
+		CTurboTrackEntry* self = new (ELeave) CTurboTrackEntry;
+		CleanupStack::PushL(self);
+		self->iDisplay = aDisplay.AllocL();
+		if (aLocalPath)
+			{
+			self->iLocalPath = aLocalPath->AllocL();
+			}
+		if (aRemoteUrl)
+			{
+			self->iRemoteUrl = aRemoteUrl->AllocL();
+			}
+		if (aFileName)
+			{
+			self->iFileName = aFileName->AllocL();
+			}
+		self->iCached = aCached;
+		self->iPermanent = aPermanent;
+		self->iOnlineOnly = aOnlineOnly;
+		return self;
+		}
+
+	~CTurboTrackEntry()
+		{
+		delete iDisplay;
+		delete iLocalPath;
+		delete iRemoteUrl;
+		delete iFileName;
+		}
+
+	void SetDisplayL(const TDesC& aDisplay)
+		{
+		delete iDisplay;
+		iDisplay = NULL;
+		iDisplay = aDisplay.AllocL();
+		}
+
+	void SetLocalPathL(const TDesC& aPath)
+		{
+		delete iLocalPath;
+		iLocalPath = NULL;
+		iLocalPath = aPath.AllocL();
+		}
+
+	void SetFileNameL(const TDesC& aFileName)
+		{
+		delete iFileName;
+		iFileName = NULL;
+		iFileName = aFileName.AllocL();
+		}
+
+public:
+	HBufC* iDisplay;
+	HBufC* iLocalPath;
+	HBufC* iRemoteUrl;
+	HBufC* iFileName;
+	TBool iCached;
+	TBool iPermanent;
+	TBool iOnlineOnly;
+	};
+
+static CTurboTrackEntry* CloneTrackEntryLC(const CTurboTrackEntry& aEntry)
+	{
+	TPtrC display(KNullDesC);
+	if (aEntry.iDisplay)
+		{
+		display.Set(*aEntry.iDisplay);
+		}
+	return CTurboTrackEntry::NewLC(
+		display,
+		aEntry.iLocalPath,
+		aEntry.iRemoteUrl,
+		aEntry.iFileName,
+		aEntry.iCached,
+		aEntry.iPermanent,
+		aEntry.iOnlineOnly);
+	}
+
+static void CleanupTrackArray(TAny* aPtr)
+	{
+	RPointerArray<CTurboTrackEntry>* arr = (RPointerArray<CTurboTrackEntry>*)aPtr;
+	if (arr)
+		{
+		arr->ResetAndDestroy();
+		arr->Close();
+		}
+	}
+
+class CTurboMusicService : public CBase
+	{
+public:
+	static CTurboMusicService* NewL(CTurboMusicCacheManager& aCacheManager);
+	~CTurboMusicService();
+
+	void SearchHybridL(const TDesC& aQuery, RPointerArray<CTurboTrackEntry>& aOut);
+	void SearchOnlineOnlyL(const TDesC& aQuery, RPointerArray<CTurboTrackEntry>& aOut);
+	void ListLibraryL(RPointerArray<CTurboTrackEntry>& aOut);
+	void PrepareTrackForPlaybackL(CTurboTrackEntry& aEntry, TDes& aLocalPath, TBool& aFromInternet);
+	void SaveTrackPermanentL(CTurboTrackEntry& aEntry);
+	void DeleteTrackL(CTurboTrackEntry& aEntry);
+	TInt CleanCacheL();
+	void TrimCacheL();
+
+private:
+	CTurboMusicService(CTurboMusicCacheManager& aCacheManager);
+	void ConstructL();
+	void AppendLocalMatchesInDirL(RFs& aFs, const TDesC& aDir, const TDesC& aQuery, TBool aPermanent, RPointerArray<CTurboTrackEntry>& aOut, TInt aLimit);
+	void AppendAllInDirL(RFs& aFs, const TDesC& aDir, TBool aPermanent, RPointerArray<CTurboTrackEntry>& aOut, TInt aLimit);
+	void AppendRemoteSearchResultsL(const TDesC& aQuery, RPointerArray<CTurboTrackEntry>& aOut, TInt aLimit);
+	void FetchQueryToServerL(const TDesC& aQuery);
+	void DownloadToCacheL(CTurboTrackEntry& aEntry, TDes& aOutPath);
+	void ResolvePermanentMusicDirL(RFs& aFs, TDes& aOut);
+	void BuildPrefixedDisplay(const TDesC& aPrefix, const TDesC& aName, TDes& aOut);
+
+private:
+	CTurboMusicCacheManager& iCacheManager;
+	};
+
+CTurboMusicService* CTurboMusicService::NewL(CTurboMusicCacheManager& aCacheManager)
+	{
+	CTurboMusicService* self = new (ELeave) CTurboMusicService(aCacheManager);
+	CleanupStack::PushL(self);
+	self->ConstructL();
+	CleanupStack::Pop(self);
+	return self;
+	}
+
+CTurboMusicService::CTurboMusicService(CTurboMusicCacheManager& aCacheManager)
+	: iCacheManager(aCacheManager)
+	{
+	}
+
+void CTurboMusicService::ConstructL()
+	{
+	TrimCacheL();
+	}
+
+CTurboMusicService::~CTurboMusicService()
+	{
+	}
+
+void CTurboMusicService::BuildPrefixedDisplay(const TDesC& aPrefix, const TDesC& aName, TDes& aOut)
+	{
+	aOut.Copy(aPrefix.Left(aOut.MaxLength()));
+	const TInt free = aOut.MaxLength() - aOut.Length();
+	if (free > 0)
+		{
+		if (aName.Length() <= free)
+			{
+			aOut.Append(aName);
+			}
+		else
+			{
+			aOut.Append(aName.Left(free));
+			}
+		}
+	}
+
+void CTurboMusicService::AppendLocalMatchesInDirL(RFs& aFs, const TDesC& aDir, const TDesC& aQuery, TBool aPermanent, RPointerArray<CTurboTrackEntry>& aOut, TInt aLimit)
+	{
+	CDir* dir = NULL;
+	TFileName pattern(aDir);
+	pattern.Append(_L("*.*"));
+	if (aFs.GetDir(pattern, KEntryAttNormal, ESortByName, dir) != KErrNone)
+		{
+		return;
+		}
+	CleanupStack::PushL(dir);
+	for (TInt i = 0; i < dir->Count() && aOut.Count() < aLimit; ++i)
+		{
+		const TEntry& entry = (*dir)[i];
+		if (entry.IsDir())
+			{
+			continue;
+			}
+		if (!(entry.iName.Right(4).CompareF(_L(".mp3")) == 0 || entry.iName.Right(4).CompareF(_L(".m4a")) == 0 || entry.iName.Right(4).CompareF(_L(".aac")) == 0))
+			{
+			continue;
+			}
+		if (aQuery.Length() > 0 && entry.iName.FindF(aQuery) < 0)
+			{
+			continue;
+			}
+		TFileName fullPath(aDir);
+		fullPath.Append(entry.iName);
+		TBuf<160> display;
+		BuildPrefixedDisplay(aPermanent ? _L("Zapisane: ") : _L("Cache: "), entry.iName, display);
+		CTurboTrackEntry* item = CTurboTrackEntry::NewLC(display, &fullPath, NULL, &entry.iName, !aPermanent, aPermanent, EFalse);
+		aOut.AppendL(item);
+		CleanupStack::Pop(item);
+		}
+	CleanupStack::PopAndDestroy(dir);
+	}
+
+void CTurboMusicService::AppendAllInDirL(RFs& aFs, const TDesC& aDir, TBool aPermanent, RPointerArray<CTurboTrackEntry>& aOut, TInt aLimit)
+	{
