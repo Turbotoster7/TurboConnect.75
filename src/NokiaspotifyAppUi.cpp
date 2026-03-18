@@ -1069,3 +1069,105 @@ void CTurboMusicService::AppendLocalMatchesInDirL(RFs& aFs, const TDesC& aDir, c
 
 void CTurboMusicService::AppendAllInDirL(RFs& aFs, const TDesC& aDir, TBool aPermanent, RPointerArray<CTurboTrackEntry>& aOut, TInt aLimit)
 	{
+	TBuf<1> empty;
+	AppendLocalMatchesInDirL(aFs, aDir, empty, aPermanent, aOut, aLimit);
+	}
+
+void CTurboMusicService::FetchQueryToServerL(const TDesC& aQuery)
+	{
+	_LIT(KHost, "turboconect.pl");
+	HBufC* encoded = UrlEncodeSimpleLC(aQuery);
+	HBufC* path = HBufC::NewLC(64 + encoded->Length());
+	path->Des().Copy(_L("/api/fetch"));
+	if (encoded->Length() > 0)
+		{
+		path->Des().Append(_L("?q="));
+		path->Des().Append(*encoded);
+		}
+	HBufC8* resp = HttpGetSmallResponseL(KHost, *path, 12288);
+	CleanupStack::PushL(resp);
+	CleanupStack::PopAndDestroy(resp);
+	CleanupStack::PopAndDestroy(path);
+	CleanupStack::PopAndDestroy(encoded);
+	}
+
+void CTurboMusicService::AppendRemoteSearchResultsL(const TDesC& aQuery, RPointerArray<CTurboTrackEntry>& aOut, TInt aLimit)
+	{
+	if (aOut.Count() >= aLimit)
+		{
+		return;
+		}
+	_LIT(KHost, "turboconect.pl");
+	HBufC* encoded = UrlEncodeSimpleLC(aQuery);
+	HBufC* path = HBufC::NewLC(64 + encoded->Length());
+	path->Des().Copy(_L("/api/search_plain"));
+	if (encoded->Length() > 0)
+		{
+		path->Des().Append(_L("?q="));
+		path->Des().Append(*encoded);
+		}
+	HBufC8* resp = HttpGetSmallResponseL(KHost, *path, KOnlineSearchResponseBytes);
+	CleanupStack::PushL(resp);
+	TPtrC8 body = HttpBodyFromResponse8(*resp);
+	if (body.Length() == 0)
+		{
+		CleanupStack::PopAndDestroy(resp);
+		FetchQueryToServerL(aQuery);
+		resp = HttpGetSmallResponseL(KHost, *path, KOnlineSearchResponseBytes);
+		CleanupStack::PushL(resp);
+		body.Set(HttpBodyFromResponse8(*resp));
+		}
+
+	TInt pos = 0;
+	while (pos < body.Length() && aOut.Count() < aLimit)
+		{
+		TInt end = body.Mid(pos).Locate('\n');
+		if (end < 0)
+			{
+			end = body.Length() - pos;
+			}
+		TPtrC8 line = body.Mid(pos, end);
+		while (line.Length() > 0 && (line[line.Length() - 1] == '\r' || line[line.Length() - 1] == '\n'))
+			{
+			line.Set(line.Left(line.Length() - 1));
+			}
+		const TInt sep1 = line.Locate('|');
+		const TInt sep2rel = (sep1 >= 0) ? line.Mid(sep1 + 1).Locate('|') : KErrNotFound;
+		if (sep1 > 0 && sep2rel >= 0)
+			{
+			const TInt sep2 = sep1 + 1 + sep2rel;
+			TPtrC8 title8 = line.Left(sep1);
+			TPtrC8 fileName8 = line.Mid(sep1 + 1, sep2 - sep1 - 1);
+			TPtrC8 url8 = line.Mid(sep2 + 1);
+			TBuf<128> title;
+			TBuf<128> fileName;
+			TBuf<256> url;
+			CopyAscii8ToDes(title, title8);
+			CopyAscii8ToDes(fileName, fileName8);
+			CopyAscii8ToDes(url, url8);
+			TBuf<160> display;
+			BuildPrefixedDisplay(_L("Online: "), title, display);
+			CTurboTrackEntry* item = CTurboTrackEntry::NewLC(display, NULL, &url, &fileName, EFalse, EFalse, ETrue);
+			aOut.AppendL(item);
+			CleanupStack::Pop(item);
+			}
+		pos += end + 1;
+		}
+
+	CleanupStack::PopAndDestroy(resp);
+	CleanupStack::PopAndDestroy(path);
+	CleanupStack::PopAndDestroy(encoded);
+	}
+
+void CTurboMusicService::SearchHybridL(const TDesC& aQuery, RPointerArray<CTurboTrackEntry>& aOut)
+	{
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	AppendLocalMatchesInDirL(fs, iCacheManager.CacheDir(), aQuery, EFalse, aOut, KTrackListMax);
+	AppendLocalMatchesInDirL(fs, KMusicDirE, aQuery, ETrue, aOut, KTrackListMax);
+	AppendLocalMatchesInDirL(fs, KMusicDirC, aQuery, ETrue, aOut, KTrackListMax);
+	AppendLocalMatchesInDirL(fs, KTurboMusicDirE, aQuery, ETrue, aOut, KTrackListMax);
+	AppendLocalMatchesInDirL(fs, KTurboMusicDirC, aQuery, ETrue, aOut, KTrackListMax);
+	CleanupStack::PopAndDestroy(&fs);
+	if (aQuery.Length() > 0 && aOut.Count() == 0)
