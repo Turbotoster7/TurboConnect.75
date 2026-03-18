@@ -1266,3 +1266,208 @@ void CTurboMusicService::DownloadToCacheL(CTurboTrackEntry& aEntry, TDes& aOutPa
 
 	HBufC8* headerBuf = HBufC8::NewLC(4096);
 	TPtr8 header = headerBuf->Des();
+	TBool headerDone = EFalse;
+	TBool wroteBody = EFalse;
+	for (;;)
+		{
+		TBuf8<1024> chunk;
+		TSockXfrLength len;
+		sock.RecvOneOrMore(chunk, 0, st, len);
+		User::WaitForRequest(st);
+		if (st.Int() == KErrEof || chunk.Length() == 0)
+			{
+			break;
+			}
+		User::LeaveIfError(st.Int());
+		if (!headerDone)
+			{
+			if (header.Length() + chunk.Length() > header.MaxLength())
+				{
+				User::Leave(KErrOverflow);
+				}
+			header.Append(chunk);
+			const TInt hdrEnd = header.Find(_L8("\r\n\r\n"));
+			if (hdrEnd >= 0)
+				{
+				if (header.Find(_L8("HTTP/1.1 200")) < 0 && header.Find(_L8("HTTP/1.0 200")) < 0)
+					{
+					User::Leave(KErrGeneral);
+					}
+				TPtrC8 bodyPart = header.Mid(hdrEnd + 4);
+				if (bodyPart.Length() > 0)
+					{
+					User::LeaveIfError(outFile.Write(bodyPart));
+					wroteBody = ETrue;
+					}
+				headerDone = ETrue;
+				}
+			}
+		else
+			{
+			User::LeaveIfError(outFile.Write(chunk));
+			wroteBody = ETrue;
+			}
+		}
+
+	if (!headerDone || !wroteBody)
+		{
+		User::Leave(KErrCorrupt);
+		}
+
+	CleanupStack::PopAndDestroy(headerBuf);
+	CleanupStack::PopAndDestroy(req);
+	CleanupStack::PopAndDestroy(path8);
+	CleanupStack::PopAndDestroy(&sock);
+	CleanupStack::PopAndDestroy(&resolver);
+	CleanupStack::PopAndDestroy(&ss);
+	CleanupStack::PopAndDestroy(&outFile);
+	CleanupStack::PopAndDestroy(&fs);
+
+	TrimCacheL();
+	aOutPath.Copy(target);
+	aEntry.SetLocalPathL(target);
+	aEntry.iCached = ETrue;
+	aEntry.iOnlineOnly = EFalse;
+	}
+
+void CTurboMusicService::PrepareTrackForPlaybackL(CTurboTrackEntry& aEntry, TDes& aLocalPath, TBool& aFromInternet)
+	{
+	aFromInternet = EFalse;
+	if (aEntry.iLocalPath && aEntry.iLocalPath->Length() > 0)
+		{
+		aLocalPath.Copy(*aEntry.iLocalPath);
+		aFromInternet = aEntry.iCached && !aEntry.iPermanent;
+		return;
+		}
+	DownloadToCacheL(aEntry, aLocalPath);
+	aFromInternet = ETrue;
+	}
+
+void CTurboMusicService::SaveTrackPermanentL(CTurboTrackEntry& aEntry)
+	{
+	TFileName sourcePath;
+	TBool fromInternet = EFalse;
+	PrepareTrackForPlaybackL(aEntry, sourcePath, fromInternet);
+
+	if (aEntry.iPermanent)
+		{
+		return;
+		}
+
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TFileName musicDir;
+	ResolvePermanentMusicDirL(fs, musicDir);
+	EnsureFolderL(fs, musicDir);
+
+	TBuf<128> safeName;
+	if (aEntry.iFileName && aEntry.iFileName->Length() > 0)
+		{
+		safeName.Copy(aEntry.iFileName->Left(safeName.MaxLength()));
+		}
+	else
+		{
+		LeafNameFromPath(sourcePath, safeName);
+		}
+	SanitizeFileName(safeName);
+
+	TFileName target(musicDir);
+	target.Append(safeName);
+	TEntry existing;
+	if (fs.Entry(target, existing) != KErrNone)
+		{
+		CopyFileSimpleL(fs, sourcePath, target);
+		}
+	if ((fromInternet || aEntry.iCached) && sourcePath.CompareF(target) != 0)
+		{
+		fs.Delete(sourcePath);
+		}
+	aEntry.SetLocalPathL(target);
+	aEntry.SetFileNameL(safeName);
+	aEntry.iPermanent = ETrue;
+	aEntry.iCached = EFalse;
+	aEntry.iOnlineOnly = EFalse;
+	TBuf<160> display;
+	BuildPrefixedDisplay(_L("Zapisane: "), safeName, display);
+	aEntry.SetDisplayL(display);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CTurboMusicService::DeleteTrackL(CTurboTrackEntry& aEntry)
+	{
+	if (!aEntry.iLocalPath || aEntry.iLocalPath->Length() == 0)
+		{
+		User::Leave(KErrNotFound);
+		}
+
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	const TInt err = fs.Delete(*aEntry.iLocalPath);
+	if (err != KErrNone)
+		{
+		User::Leave(err);
+		}
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+TInt CTurboMusicService::CleanCacheL()
+	{
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TInt removed = 0;
+	CDir* dir = NULL;
+	if (fs.GetDir(iCacheManager.CacheDir(), KEntryAttNormal, ESortNone, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			const TEntry& entry = (*dir)[i];
+			if (entry.IsDir())
+				{
+				continue;
+				}
+			TFileName path(iCacheManager.CacheDir());
+			path.Append(entry.iName);
+			if (fs.Delete(path) == KErrNone)
+				{
+				++removed;
+				}
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+	CleanupStack::PopAndDestroy(&fs);
+	return removed;
+	}
+
+void CTurboMusicService::TrimCacheL()
+	{
+	iCacheManager.RecalculatePolicyL();
+	iCacheManager.TrimIfNeededL();
+	}
+
+// ============================ MEMBER FUNCTIONS ===============================
+
+
+// -----------------------------------------------------------------------------
+// CNokiaspotifyAppUi::ConstructL()
+// Symbian 2nd phase constructor can leave.
+// -----------------------------------------------------------------------------
+//
+void CNokiaspotifyAppUi::ConstructL()
+	{
+	// Initialise app UI with standard value.
+	BaseConstructL(CAknAppUi::EAknEnableSkin);
+	InitializeCacheManagerL();
+	delete iMusicService;
+	iMusicService = NULL;
+	iMusicService = CTurboMusicService::NewL(*iCacheManager);
+	delete iNetwork;
+	iNetwork = NULL;
+	iNetwork = CNokiaspotifyNetwork::NewL();
+
+	iAppView = CNokiaspotifyAppView::NewL(ClientRect());
+	AddToStackL(iAppView);
+	iAppView->SetFocus(ETrue);
