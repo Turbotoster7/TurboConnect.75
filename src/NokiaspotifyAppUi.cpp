@@ -400,3 +400,179 @@ static void EnsureFolderL(RFs& aFs, const TDesC& aFolder)
 	}
 
 static void CopyFileSimpleL(RFs& aFs, const TDesC& aSource, const TDesC& aTarget)
+	{
+	RFile inFile;
+	User::LeaveIfError(inFile.Open(aFs, aSource, EFileRead | EFileShareReadersOnly));
+	CleanupClosePushL(inFile);
+
+	RFile outFile;
+	User::LeaveIfError(outFile.Replace(aFs, aTarget, EFileWrite | EFileShareExclusive));
+	CleanupClosePushL(outFile);
+
+	TBuf8<1024> buffer;
+	for (;;)
+		{
+		buffer.Zero();
+		User::LeaveIfError(inFile.Read(buffer));
+		if (buffer.Length() == 0)
+			{
+			break;
+			}
+		User::LeaveIfError(outFile.Write(buffer));
+		}
+
+	CleanupStack::PopAndDestroy(&outFile);
+	CleanupStack::PopAndDestroy(&inFile);
+	}
+
+static void AppendLineToTextFileL(RFs& aFs, const TDesC& aPath, const TDesC& aLine)
+	{
+	RFile file;
+	TInt openErr = file.Open(aFs, aPath, EFileWrite | EFileShareAny);
+	if (openErr == KErrNotFound)
+		{
+		User::LeaveIfError(file.Create(aFs, aPath, EFileWrite | EFileShareAny));
+		}
+	else
+		{
+		User::LeaveIfError(openErr);
+		}
+	CleanupClosePushL(file);
+	TInt pos = 0;
+	User::LeaveIfError(file.Seek(ESeekEnd, pos));
+
+	TFileText writer;
+	writer.Set(file);
+	User::LeaveIfError(writer.Write(aLine));
+	User::LeaveIfError(writer.Write(_L("\r\n")));
+	CleanupStack::PopAndDestroy(&file);
+	}
+
+static void RewriteTextFileL(RFs& aFs, const TDesC& aPath, const RPointerArray<HBufC>& aLines)
+	{
+	RFile file;
+	TInt err = file.Replace(aFs, aPath, EFileWrite | EFileShareAny);
+	if (err == KErrPathNotFound)
+		{
+		TFileName parent(aPath);
+		const TInt slash = parent.LocateReverse('\\');
+		if (slash > 2)
+			{
+			parent.SetLength(slash + 1);
+			EnsureFolderL(aFs, parent);
+			}
+		err = file.Replace(aFs, aPath, EFileWrite | EFileShareAny);
+		}
+	User::LeaveIfError(err);
+	CleanupClosePushL(file);
+	TFileText writer;
+	writer.Set(file);
+	for (TInt i = 0; i < aLines.Count(); ++i)
+		{
+		User::LeaveIfError(writer.Write(*aLines[i]));
+		User::LeaveIfError(writer.Write(_L("\r\n")));
+		}
+	CleanupStack::PopAndDestroy(&file);
+	}
+
+static void CleanupOwnedBufArray(TAny* aPtr)
+	{
+	RPointerArray<HBufC>* arr = (RPointerArray<HBufC>*)aPtr;
+	if (arr)
+		{
+		arr->ResetAndDestroy();
+		arr->Close();
+		}
+	}
+
+static void AppendOwnedBufL(RPointerArray<HBufC>& aOut, const TDesC& aText)
+	{
+	HBufC* item = aText.AllocLC();
+	aOut.AppendL(item);
+	CleanupStack::Pop(item);
+	}
+
+static void ReadTextFileLinesL(RFs& aFs, const TDesC& aPath, RPointerArray<HBufC>& aOut)
+	{
+	RFile file;
+	if (file.Open(aFs, aPath, EFileRead | EFileShareReadersOnly) != KErrNone)
+		{
+		return;
+		}
+	CleanupClosePushL(file);
+	TFileText reader;
+	reader.Set(file);
+	TBuf<256> line;
+	for (;;)
+		{
+		const TInt err = reader.Read(line);
+		if (err == KErrEof)
+			{
+			break;
+			}
+		User::LeaveIfError(err);
+		if (line.Length() > 0)
+			{
+			AppendOwnedBufL(aOut, line);
+			}
+		}
+	CleanupStack::PopAndDestroy(&file);
+	}
+
+static void ScanMusicFilesInDirL(RFs& aFs, const TDesC& aDir, const TDesC& aQuery, RPointerArray<HBufC>& aOut)
+	{
+	CDir* mp3 = NULL;
+	TFileName mp3Pattern(aDir);
+	mp3Pattern.Append(_L("*.mp3"));
+	if (aFs.GetDir(mp3Pattern, KEntryAttNormal, ESortByName, mp3) == KErrNone)
+		{
+		CleanupStack::PushL(mp3);
+		for (TInt i = 0; i < mp3->Count(); ++i)
+			{
+			const TEntry& e = (*mp3)[i];
+			if (aQuery.Length() == 0 || e.iName.FindF(aQuery) >= 0)
+				{
+				AppendOwnedBufL(aOut, e.iName);
+				if (aOut.Count() >= 40)
+					{
+					break;
+					}
+				}
+			}
+		CleanupStack::PopAndDestroy(mp3);
+		}
+
+	CDir* m4a = NULL;
+	TFileName m4aPattern(aDir);
+	m4aPattern.Append(_L("*.m4a"));
+	if (aFs.GetDir(m4aPattern, KEntryAttNormal, ESortByName, m4a) == KErrNone)
+		{
+		CleanupStack::PushL(m4a);
+		for (TInt i = 0; i < m4a->Count(); ++i)
+			{
+			const TEntry& e = (*m4a)[i];
+			if (aQuery.Length() == 0 || e.iName.FindF(aQuery) >= 0)
+				{
+				AppendOwnedBufL(aOut, e.iName);
+				if (aOut.Count() >= 40)
+					{
+					break;
+					}
+				}
+			}
+		CleanupStack::PopAndDestroy(m4a);
+		}
+	}
+
+static TBool FindFirstMusicFileInDirL(RFs& aFs, const TDesC& aDir, const TDesC& aQuery, TDes& aOut)
+	{
+	CDir* mp3 = NULL;
+	TFileName mp3Pattern(aDir);
+	mp3Pattern.Append(_L("*.mp3"));
+	if (aFs.GetDir(mp3Pattern, KEntryAttNormal, ESortByName, mp3) == KErrNone)
+		{
+		CleanupStack::PushL(mp3);
+		for (TInt i = 0; i < mp3->Count(); ++i)
+			{
+			const TEntry& e = (*mp3)[i];
+			if (aQuery.Length() == 0 || e.iName.FindF(aQuery) >= 0)
