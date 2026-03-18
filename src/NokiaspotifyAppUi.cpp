@@ -676,3 +676,201 @@ static void ResolveMusicDirL(RFs& aFs, TDes& aOut)
 		}
 	}
 
+static void LeafNameFromPath(const TDesC& aPath, TDes& aOut)
+	{
+	const TInt slash = aPath.LocateReverse('\\');
+	if (slash >= 0 && slash + 1 < aPath.Length())
+		{
+		aOut.Copy(aPath.Mid(slash + 1));
+		}
+	else
+		{
+		aOut.Copy(aPath.Left(aOut.MaxLength()));
+		}
+	}
+
+class CTurboMusicCacheManager : public CBase
+	{
+public:
+	static CTurboMusicCacheManager* NewL();
+	~CTurboMusicCacheManager();
+
+	void RecalculatePolicyL();
+	void TrimIfNeededL();
+	TInt64 CacheUsedBytesL();
+	TInt64 CacheLimitBytes();
+	const TDesC& CacheDir();
+
+private:
+	CTurboMusicCacheManager();
+	void ConstructL();
+	void SelectCacheDriveL();
+	void EnsureCacheDirectoryL();
+	TInt64 ComputeRecommendedLimitBytesL();
+	void ScanCacheL(TInt64& aTotalBytes, TFileName& aOldestFile, TTime& aOldestTime, TBool& aHasOldest);
+
+private:
+	RFs iFs;
+	TFileName iCacheDir;
+	TInt iCacheDrive;
+	TInt64 iCacheLimitBytes;
+	};
+
+CTurboMusicCacheManager* CTurboMusicCacheManager::NewL()
+	{
+	CTurboMusicCacheManager* self = new (ELeave) CTurboMusicCacheManager();
+	CleanupStack::PushL(self);
+	self->ConstructL();
+	CleanupStack::Pop(self);
+	return self;
+	}
+
+CTurboMusicCacheManager::CTurboMusicCacheManager()
+	: iCacheDrive(EDriveC)
+	, iCacheLimitBytes(100 * KOneMb)
+	{
+	}
+
+void CTurboMusicCacheManager::ConstructL()
+	{
+	User::LeaveIfError(iFs.Connect());
+	SelectCacheDriveL();
+	EnsureCacheDirectoryL();
+	RecalculatePolicyL();
+	TrimIfNeededL();
+	}
+
+CTurboMusicCacheManager::~CTurboMusicCacheManager()
+	{
+	iFs.Close();
+	}
+
+void CTurboMusicCacheManager::SelectCacheDriveL()
+	{
+	TDriveInfo info;
+	if (iFs.Drive(info, KTurboCacheDefaultDrive) == KErrNone &&
+		info.iType != EMediaNotPresent)
+		{
+		iCacheDrive = KTurboCacheDefaultDrive;
+		iCacheDir = KCacheDirOnE;
+		}
+	else
+		{
+		iCacheDrive = EDriveC;
+		iCacheDir = KCacheDirOnC;
+		}
+	}
+
+void CTurboMusicCacheManager::EnsureCacheDirectoryL()
+	{
+	const TInt err = iFs.MkDirAll(iCacheDir);
+	if (err != KErrNone && err != KErrAlreadyExists)
+		{
+		User::Leave(err);
+		}
+	}
+
+TInt64 CTurboMusicCacheManager::ComputeRecommendedLimitBytesL()
+	{
+	TVolumeInfo vol;
+	User::LeaveIfError(iFs.Volume(vol, iCacheDrive));
+	TInt64 freeBytes = vol.iFree;
+	TInt64 recommended = freeBytes / 10; // 10% wolnego miejsca
+	const TInt64 minLimit = 64 * KOneMb;
+	const TInt64 maxLimit = 256 * KOneMb;
+	if (recommended < minLimit)
+		{
+		recommended = minLimit;
+		}
+	if (recommended > maxLimit)
+		{
+		recommended = maxLimit;
+		}
+	// Dla ~1GB wolnego otrzymujemy ~102MB, czyli praktycznie oczekiwane 100MB.
+	return recommended;
+	}
+
+void CTurboMusicCacheManager::RecalculatePolicyL()
+	{
+	iCacheLimitBytes = ComputeRecommendedLimitBytesL();
+	}
+
+void CTurboMusicCacheManager::ScanCacheL(
+		TInt64& aTotalBytes,
+		TFileName& aOldestFile,
+		TTime& aOldestTime,
+		TBool& aHasOldest)
+	{
+	aTotalBytes = 0;
+	aHasOldest = EFalse;
+	CDir* dir = NULL;
+	User::LeaveIfError(iFs.GetDir(iCacheDir, KEntryAttNormal, ESortNone, dir));
+	CleanupStack::PushL(dir);
+	for (TInt i = 0; i < dir->Count(); ++i)
+		{
+		const TEntry& entry = (*dir)[i];
+		if (entry.IsDir())
+			{
+			continue;
+			}
+		aTotalBytes += entry.iSize;
+		if (!aHasOldest || entry.iModified < aOldestTime)
+			{
+			aHasOldest = ETrue;
+			aOldestTime = entry.iModified;
+			aOldestFile = iCacheDir;
+			aOldestFile.Append(entry.iName);
+			}
+		}
+	CleanupStack::PopAndDestroy(dir);
+	}
+
+void CTurboMusicCacheManager::TrimIfNeededL()
+	{
+	for (;;)
+		{
+		TInt64 total = 0;
+		TFileName oldestFile;
+		TTime oldestTime(0);
+		TBool hasOldest = EFalse;
+		ScanCacheL(total, oldestFile, oldestTime, hasOldest);
+		if (total <= iCacheLimitBytes || !hasOldest)
+			{
+			break;
+			}
+		User::LeaveIfError(iFs.Delete(oldestFile));
+		}
+	}
+
+TInt64 CTurboMusicCacheManager::CacheUsedBytesL()
+	{
+	TInt64 total = 0;
+	TFileName oldestFile;
+	TTime oldestTime(0);
+	TBool hasOldest = EFalse;
+	ScanCacheL(total, oldestFile, oldestTime, hasOldest);
+	return total;
+	}
+
+TInt64 CTurboMusicCacheManager::CacheLimitBytes()
+	{
+	return iCacheLimitBytes;
+	}
+
+const TDesC& CTurboMusicCacheManager::CacheDir()
+	{
+	return iCacheDir;
+	}
+
+class CTurboTrackEntry : public CBase
+	{
+public:
+	static CTurboTrackEntry* NewLC(
+		const TDesC& aDisplay,
+		const TDesC* aLocalPath,
+		const TDesC* aRemoteUrl,
+		const TDesC* aFileName,
+		TBool aCached,
+		TBool aPermanent,
+		TBool aOnlineOnly)
+		{
