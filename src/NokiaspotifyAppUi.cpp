@@ -1899,3 +1899,192 @@ void CNokiaspotifyAppUi::StopPlayback()
 		delete iAudioPlayer;
 		iAudioPlayer = NULL;
 		}
+	iAudioReady = EFalse;
+	iAudioPlaying = EFalse;
+	UpdatePlaybackUi();
+	}
+
+void CNokiaspotifyAppUi::ToggleShuffle()
+	{
+	iShuffleEnabled = !iShuffleEnabled;
+	UpdatePlaybackUi();
+	}
+
+void CNokiaspotifyAppUi::MapcInitComplete(TInt aError, const TTimeIntervalMicroSeconds& /*aDuration*/)
+	{
+	if (aError != KErrNone)
+		{
+		delete iAudioPlayer;
+		iAudioPlayer = NULL;
+		iAudioReady = EFalse;
+		iAudioPlaying = EFalse;
+		iPendingAutoPlay = EFalse;
+		TRAP_IGNORE(ShowOperationErrorL(aError));
+		UpdatePlaybackUi();
+		return;
+		}
+
+	iAudioReady = ETrue;
+	if (iAudioPlayer)
+		{
+		iAudioPlayer->SetVolume(iAudioPlayer->MaxVolume());
+		}
+	if (iPendingAutoPlay && iAudioPlayer)
+		{
+		iAudioPlayer->Play();
+		iAudioPlaying = ETrue;
+		iPendingAutoPlay = EFalse;
+		}
+	UpdatePlaybackUi();
+	}
+
+void CNokiaspotifyAppUi::MapcPlayComplete(TInt aError)
+	{
+	iAudioPlaying = EFalse;
+	iAudioReady = EFalse;
+	delete iAudioPlayer;
+	iAudioPlayer = NULL;
+
+	if (aError == KErrNone && !iStopRequested && iPlaybackQueue.Count() > 1)
+		{
+		const TInt next = ResolveNextQueueIndex();
+		if (next != KErrNotFound)
+			{
+			TRAP_IGNORE(PlayQueueIndexL(next));
+			return;
+			}
+		}
+
+	iStopRequested = EFalse;
+	UpdatePlaybackUi();
+	}
+
+void CNokiaspotifyAppUi::DownloadRemoteTrackL(const TDesC& aRelativeUrl, const TDesC& aFileName)
+	{
+	_LIT(KHost, "turboconect.pl");
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TFileName musicDir;
+	ResolveMusicDirL(fs, musicDir);
+	EnsureFolderL(fs, musicDir);
+
+	TFileName target(musicDir);
+	TBuf<128> safeName;
+	safeName.Copy(aFileName.Left(safeName.MaxLength()));
+	SanitizeFileName(safeName);
+	if (safeName.Length() == 0)
+		{
+		safeName.Copy(_L("track.mp3"));
+		}
+	target.Append(safeName);
+
+	if (iAppView)
+		{
+		TBuf<96> detail;
+		detail.Copy(_L("Pobieram: "));
+		AppendLimited(detail, safeName);
+		iAppView->SetPlaybackPanel(_L("INTERNET"), detail);
+		}
+
+	RFile outFile;
+	User::LeaveIfError(outFile.Replace(fs, target, EFileWrite | EFileShareExclusive));
+	CleanupClosePushL(outFile);
+
+	RSocketServ ss;
+	User::LeaveIfError(ss.Connect());
+	CleanupClosePushL(ss);
+
+	RHostResolver resolver;
+	User::LeaveIfError(resolver.Open(ss, KAfInet, KProtocolInetUdp));
+	CleanupClosePushL(resolver);
+	TNameEntry nameEntry;
+	User::LeaveIfError(resolver.GetByName(KHost, nameEntry));
+	TInetAddr addr = TInetAddr::Cast(nameEntry().iAddr);
+	addr.SetPort(80);
+
+	RSocket sock;
+	User::LeaveIfError(sock.Open(ss, KAfInet, KSockStream, KProtocolInetTcp));
+	CleanupClosePushL(sock);
+	TRequestStatus st;
+	sock.Connect(addr, st);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	HBufC8* path8 = ToAscii8LC(aRelativeUrl);
+	HBufC8* req = HBufC8::NewLC(path8->Length() + 128);
+	req->Des().Copy(_L8("GET "));
+	req->Des().Append(*path8);
+	req->Des().Append(_L8(" HTTP/1.0\r\nHost: turboconect.pl\r\nConnection: close\r\n\r\n"));
+
+	sock.Write(req->Des(), st);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	HBufC8* headerBuf = HBufC8::NewLC(4096);
+	TPtr8 header = headerBuf->Des();
+	TBool headerDone = EFalse;
+	TBool wroteBody = EFalse;
+	for (;;)
+		{
+		TBuf8<1024> chunk;
+		TSockXfrLength len;
+		sock.RecvOneOrMore(chunk, 0, st, len);
+		User::WaitForRequest(st);
+		if (st.Int() == KErrEof || chunk.Length() == 0)
+			{
+			break;
+			}
+		User::LeaveIfError(st.Int());
+		if (!headerDone)
+			{
+			if (header.Length() + chunk.Length() > header.MaxLength())
+				{
+				User::Leave(KErrOverflow);
+				}
+			header.Append(chunk);
+			const TInt hdrEnd = header.Find(_L8("\r\n\r\n"));
+			if (hdrEnd >= 0)
+				{
+				if (header.Find(_L8("HTTP/1.1 200")) < 0 && header.Find(_L8("HTTP/1.0 200")) < 0)
+					{
+					User::Leave(KErrGeneral);
+					}
+				TPtrC8 bodyPart = header.Mid(hdrEnd + 4);
+				if (bodyPart.Length() > 0)
+					{
+					User::LeaveIfError(outFile.Write(bodyPart));
+					wroteBody = ETrue;
+					}
+				headerDone = ETrue;
+				}
+			}
+		else
+			{
+			User::LeaveIfError(outFile.Write(chunk));
+			wroteBody = ETrue;
+			}
+		}
+
+	if (!headerDone || !wroteBody)
+		{
+		User::Leave(KErrCorrupt);
+		}
+
+	CleanupStack::PopAndDestroy(headerBuf);
+	CleanupStack::PopAndDestroy(req);
+	CleanupStack::PopAndDestroy(path8);
+	CleanupStack::PopAndDestroy(&sock);
+	CleanupStack::PopAndDestroy(&resolver);
+	CleanupStack::PopAndDestroy(&ss);
+	CleanupStack::PopAndDestroy(&outFile);
+	CleanupStack::PopAndDestroy(&fs);
+
+	_LIT(KDownloaded, "Pobrano. Odtwarzam...");
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(KDownloaded);
+	PlayLocalFileL(target, ETrue, safeName);
+	}
+
+void CNokiaspotifyAppUi::PingServerL()
+	{
