@@ -1785,3 +1785,117 @@ TInt CNokiaspotifyAppUi::ResolvePrevQueueIndex() const
 		}
 	return prev;
 	}
+
+void CNokiaspotifyAppUi::UpdatePlaybackUi()
+	{
+	if (!iAppView)
+		{
+		return;
+		}
+	if (iCurrentPlaybackName.Length() == 0)
+		{
+		iAppView->SetNowPlayingState(_L("PLAYER"), _L("Nic nie gra"), _L("Stop"), iShuffleEnabled);
+		iAppView->ClearPlaybackPanel();
+		return;
+		}
+
+	TBuf<96> detail;
+	detail.Copy(iCurrentTrackFromInternet ? _L("Online: ") : _L("Lokalnie: "));
+	AppendLimited(detail, iCurrentPlaybackName);
+
+	TBuf<32> status;
+	if (!iAudioReady && iPendingAutoPlay)
+		{
+		status.Copy(_L("Laduje"));
+		}
+	else if (iAudioPlaying)
+		{
+		status.Copy(_L("Gra"));
+		}
+	else
+		{
+		status.Copy(_L("Stop"));
+		}
+
+	iAppView->SetPlaybackPanel(_L("TERAZ GRA"), detail);
+	iAppView->SetNowPlayingState(_L("TERAZ GRA"), detail, status, iShuffleEnabled);
+	}
+
+void CNokiaspotifyAppUi::PlayLocalFileL(const TDesC& aPath, TBool aFromInternet, const TDesC& aDisplayName)
+	{
+	if (iAudioPlayer)
+		{
+		iStopRequested = ETrue;
+		iAudioPlayer->Stop();
+		delete iAudioPlayer;
+		iAudioPlayer = NULL;
+		}
+
+	iAudioReady = EFalse;
+	iAudioPlaying = EFalse;
+	iPendingAutoPlay = ETrue;
+	iStopRequested = EFalse;
+	iCurrentTrackFromInternet = aFromInternet;
+	iPendingAudioPath.Copy(aPath.Left(iPendingAudioPath.MaxLength()));
+	iPendingPlaybackName.Copy(aDisplayName.Left(iPendingPlaybackName.MaxLength()));
+	iCurrentPlaybackName.Copy(aDisplayName.Left(iCurrentPlaybackName.MaxLength()));
+	UpdatePlaybackUi();
+	iAudioPlayer = CMdaAudioPlayerUtility::NewFilePlayerL(aPath, *this);
+	}
+
+void CNokiaspotifyAppUi::PlayQueueIndexL(TInt aIndex)
+	{
+	if (aIndex < 0 || aIndex >= iPlaybackQueue.Count() || !iPlaybackQueue[aIndex] || !iMusicService)
+		{
+		User::Leave(KErrNotFound);
+		}
+
+	TFileName localPath;
+	TBool fromInternet = EFalse;
+	iMusicService->PrepareTrackForPlaybackL(*iPlaybackQueue[aIndex], localPath, fromInternet);
+
+	TBuf<96> name;
+	if (iPlaybackQueue[aIndex]->iFileName && iPlaybackQueue[aIndex]->iFileName->Length() > 0)
+		{
+		name.Copy(iPlaybackQueue[aIndex]->iFileName->Left(name.MaxLength()));
+		}
+	else if (localPath.Length() > 0)
+		{
+		LeafNameFromPath(localPath, name);
+		}
+	else if (iPlaybackQueue[aIndex]->iDisplay)
+		{
+		name.Copy(iPlaybackQueue[aIndex]->iDisplay->Left(name.MaxLength()));
+		}
+	else
+		{
+		name.Copy(_L("track"));
+		}
+
+	iPlaybackIndex = aIndex;
+	PlayLocalFileL(localPath, fromInternet, name);
+	}
+
+void CNokiaspotifyAppUi::OpenNowPlayingScreenL()
+	{
+	if (iCurrentPlaybackName.Length() == 0 || !iAppView)
+		{
+		_LIT(KNothingPlaying, "Nic nie jest zaladowane.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNothingPlaying);
+		return;
+		}
+	UpdatePlaybackUi();
+	iAppView->ShowNowPlayingScreen();
+	}
+
+void CNokiaspotifyAppUi::StopPlayback()
+	{
+	iStopRequested = ETrue;
+	iPendingAutoPlay = EFalse;
+	if (iAudioPlayer)
+		{
+		iAudioPlayer->Stop();
+		delete iAudioPlayer;
+		iAudioPlayer = NULL;
+		}
