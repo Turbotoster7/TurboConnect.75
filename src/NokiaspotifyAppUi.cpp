@@ -2088,3 +2088,207 @@ void CNokiaspotifyAppUi::DownloadRemoteTrackL(const TDesC& aRelativeUrl, const T
 
 void CNokiaspotifyAppUi::PingServerL()
 	{
+	if (!iNetwork || !iNetwork->IsConnected())
+		{
+		_LIT(KNeedNet, "Najpierw polacz internet (5 / Login).");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNeedNet);
+		return;
+		}
+
+	_LIT(KHost, "turboconect.pl");
+	// /ping nie zawsze jest publicznie wystawione; /music jest stabilnym endpointem.
+	_LIT8(KReq, "GET /music HTTP/1.0\r\nHost: turboconect.pl\r\nConnection: close\r\n\r\n");
+
+	RSocketServ ss;
+	User::LeaveIfError(ss.Connect());
+	CleanupClosePushL(ss);
+
+	RHostResolver resolver;
+	User::LeaveIfError(resolver.Open(ss, KAfInet, KProtocolInetUdp));
+	CleanupClosePushL(resolver);
+	TNameEntry nameEntry;
+	User::LeaveIfError(resolver.GetByName(KHost, nameEntry));
+	TInetAddr addr = TInetAddr::Cast(nameEntry().iAddr);
+	addr.SetPort(80);
+
+	RSocket sock;
+	User::LeaveIfError(sock.Open(ss, KAfInet, KSockStream, KProtocolInetTcp));
+	CleanupClosePushL(sock);
+	TRequestStatus st;
+	sock.Connect(addr, st);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	sock.Write(KReq, st);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	TBuf8<512> chunk;
+	TSockXfrLength len;
+	sock.RecvOneOrMore(chunk, 0, st, len);
+	User::WaitForRequest(st);
+	User::LeaveIfError(st.Int());
+
+	const TBool http200 =
+		(chunk.Find(_L8("HTTP/1.1 200")) >= 0) ||
+		(chunk.Find(_L8("HTTP/1.0 200")) >= 0);
+	const TBool httpRedirect =
+		(chunk.Find(_L8("HTTP/1.1 301")) >= 0) ||
+		(chunk.Find(_L8("HTTP/1.1 302")) >= 0) ||
+		(chunk.Find(_L8("HTTP/1.0 301")) >= 0) ||
+		(chunk.Find(_L8("HTTP/1.0 302")) >= 0);
+	if (http200 || httpRedirect)
+		{
+		_LIT(KOk, "Ping OK: serwer odpowiada HTTP.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KOk);
+		}
+	else
+		{
+		_LIT(KBad, "Ping FAIL: brak odpowiedzi HTTP 200/30x.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KBad);
+		}
+
+	CleanupStack::PopAndDestroy(&sock);
+	CleanupStack::PopAndDestroy(&resolver);
+	CleanupStack::PopAndDestroy(&ss);
+	}
+
+void CNokiaspotifyAppUi::SearchMusicL()
+	{
+	TBuf<64> query;
+	_LIT(KPrompt, "Szukaj muzyki");
+	if (!PromptTextL(query, KPrompt))
+		{
+		return;
+		}
+	SearchMusicByQueryL(query);
+	}
+
+void CNokiaspotifyAppUi::SearchMusicByQueryL(const TDesC& aQuery)
+	{
+	if (aQuery.Length() == 0)
+		{
+		_LIT(KNoQuery, "Podaj nazwe utworu.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoQuery);
+		return;
+		}
+	ResetCurrentTrackList();
+	if (iMusicService)
+		{
+		iMusicService->SearchHybridL(aQuery, iCurrentTracks);
+		}
+	if (iCurrentTracks.Count() == 0)
+		{
+		_LIT(KNoneResults, "Brak wynikow.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoneResults);
+		return;
+		}
+	ShowCurrentTrackListL(_L("Wyniki"));
+	}
+
+void CNokiaspotifyAppUi::SearchMusicOnlineL()
+	{
+	TBuf<64> query;
+	_LIT(KPrompt, "Szukaj online");
+	if (!PromptTextL(query, KPrompt))
+		{
+		return;
+		}
+	SearchMusicOnlineByQueryL(query);
+	}
+
+void CNokiaspotifyAppUi::SearchMusicOnlineByQueryL(const TDesC& aQuery)
+	{
+	if (aQuery.Length() == 0)
+		{
+		_LIT(KNoQuery, "Podaj nazwe utworu.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoQuery);
+		return;
+		}
+	OpenOnlineSearchL(aQuery);
+	}
+
+void CNokiaspotifyAppUi::ShowTrackListL()
+	{
+	ResetCurrentTrackList();
+	if (iMusicService)
+		{
+		iMusicService->ListLibraryL(iCurrentTracks);
+		}
+	if (iCurrentTracks.Count() == 0)
+		{
+		_LIT(KNoTracks, "Brak utworow w bibliotece.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoTracks);
+		}
+	else
+		{
+		ShowCurrentTrackListL(_L("Biblioteka"));
+		}
+	}
+
+void CNokiaspotifyAppUi::ResetCurrentTrackList()
+	{
+	iCurrentTracks.ResetAndDestroy();
+	iCurrentTracks.Close();
+	}
+
+void CNokiaspotifyAppUi::ShowCurrentTrackListL(const TDesC& aTitle)
+	{
+	if (!iAppView)
+		{
+		return;
+		}
+	iCurrentTrackListTitle.Copy(aTitle.Left(iCurrentTrackListTitle.MaxLength()));
+	RPointerArray<HBufC> labels;
+	CleanupStack::PushL(TCleanupItem(CleanupOwnedBufArray, &labels));
+	for (TInt i = 0; i < iCurrentTracks.Count(); ++i)
+		{
+		if (iCurrentTracks[i] && iCurrentTracks[i]->iDisplay)
+			{
+			AppendOwnedBufL(labels, *iCurrentTracks[i]->iDisplay);
+			}
+		}
+	iAppView->ShowTrackListL(labels, aTitle);
+	CleanupStack::PopAndDestroy(&labels);
+	}
+
+void CNokiaspotifyAppUi::ShowOperationErrorL(TInt aErr)
+	{
+	_LIT(KNoMemory, "Brak pamieci RAM. Sprobuj krotszego szukania albo zamknij inne aplikacje.");
+	_LIT(KNotFound, "Nie znaleziono lokalnego pliku do tej operacji.");
+	_LIT(KOverflow, "Za duzo danych z serwera. Sprobuj dokladniejszej frazy.");
+	_LIT(KCorrupt, "Serwer zwrocil niepelne dane.");
+	_LIT(KGenericFmt, "Blad operacji: %d");
+	const TDesC* text = NULL;
+	switch (aErr)
+		{
+		case KErrNoMemory:
+			text = &KNoMemory;
+			break;
+		case KErrNotFound:
+			text = &KNotFound;
+			break;
+		case KErrOverflow:
+			text = &KOverflow;
+			break;
+		case KErrCorrupt:
+			text = &KCorrupt;
+			break;
+		default:
+			break;
+		}
+
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	if (text)
+		{
+		note->ExecuteLD(*text);
+		return;
+		}
+
