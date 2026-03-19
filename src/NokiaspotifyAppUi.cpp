@@ -1679,3 +1679,109 @@ void CNokiaspotifyAppUi::ToggleInternetConnectionL()
 
 void CNokiaspotifyAppUi::OpenOnlineSearchL(const TDesC& aQuery)
 	{
+	if (!iNetwork || !iNetwork->IsConnected())
+		{
+		_LIT(KNeedNet, "Najpierw polacz internet (5 / Login).");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNeedNet);
+		return;
+		}
+
+	if (iAppView)
+		{
+		iAppView->SetPlaybackPanel(_L("INTERNET"), _L("Szukam na serwerze..."));
+		}
+
+	ResetCurrentTrackList();
+	if (iMusicService)
+		{
+		iMusicService->SearchOnlineOnlyL(aQuery, iCurrentTracks);
+		}
+	if (iCurrentTracks.Count() == 0)
+		{
+		_LIT(KNoOnline, "Brak wynikow online.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoOnline);
+		return;
+		}
+	ShowCurrentTrackListL(_L("Online"));
+	}
+
+void CNokiaspotifyAppUi::ResetPlaybackQueue()
+	{
+	iPlaybackQueue.ResetAndDestroy();
+	iPlaybackIndex = KErrNotFound;
+	}
+
+void CNokiaspotifyAppUi::CopyCurrentTracksToPlaybackQueueL()
+	{
+	ResetPlaybackQueue();
+	for (TInt i = 0; i < iCurrentTracks.Count(); ++i)
+		{
+		if (!iCurrentTracks[i])
+			{
+			continue;
+			}
+		CTurboTrackEntry* copy = CloneTrackEntryLC(*iCurrentTracks[i]);
+		iPlaybackQueue.AppendL(copy);
+		CleanupStack::Pop(copy);
+		}
+	}
+
+TInt CNokiaspotifyAppUi::ResolveNextQueueIndex() const
+	{
+	const TInt count = iPlaybackQueue.Count();
+	if (count <= 0)
+		{
+		return KErrNotFound;
+		}
+	if (count == 1)
+		{
+		return 0;
+		}
+	if (!iShuffleEnabled)
+		{
+		return (iPlaybackIndex >= 0) ? ((iPlaybackIndex + 1) % count) : 0;
+		}
+	TTime now;
+	now.HomeTime();
+	TInt next = (TInt)(now.Int64() % count);
+	if (next < 0)
+		{
+		next = -next;
+		}
+	if (next == iPlaybackIndex)
+		{
+		next = (next + 1) % count;
+		}
+	return next;
+	}
+
+TInt CNokiaspotifyAppUi::ResolvePrevQueueIndex() const
+	{
+	const TInt count = iPlaybackQueue.Count();
+	if (count <= 0)
+		{
+		return KErrNotFound;
+		}
+	if (count == 1)
+		{
+		return 0;
+		}
+	if (!iShuffleEnabled)
+		{
+		return (iPlaybackIndex > 0) ? (iPlaybackIndex - 1) : (count - 1);
+		}
+	TTime now;
+	now.HomeTime();
+	TInt prev = (TInt)((now.Int64() / 2) % count);
+	if (prev < 0)
+		{
+		prev = -prev;
+		}
+	if (prev == iPlaybackIndex)
+		{
+		prev = (prev + count - 1) % count;
+		}
+	return prev;
+	}
