@@ -1471,3 +1471,211 @@ void CNokiaspotifyAppUi::ConstructL()
 	iAppView = CNokiaspotifyAppView::NewL(ClientRect());
 	AddToStackL(iAppView);
 	iAppView->SetFocus(ETrue);
+	TRAP_IGNORE(ShowWelcomeDialogL());
+	TRAP_IGNORE(RebuildLocalLibraryIndexL());
+	iAppView->DrawNow();
+	}
+// -----------------------------------------------------------------------------
+// CNokiaspotifyAppUi::CNokiaspotifyAppUi()
+// C++ default constructor can NOT contain any code, that might leave.
+// -----------------------------------------------------------------------------
+//
+CNokiaspotifyAppUi::CNokiaspotifyAppUi()
+	: iAppView(NULL)
+	, iCacheManager(NULL)
+	, iNetwork(NULL)
+	, iMusicService(NULL)
+	, iAudioPlayer(NULL)
+	, iPlaybackIndex(KErrNotFound)
+	, iAudioReady(EFalse)
+	, iAudioPlaying(EFalse)
+	, iShuffleEnabled(EFalse)
+	, iPendingAutoPlay(EFalse)
+	, iStopRequested(EFalse)
+	, iCurrentTrackFromInternet(EFalse)
+	{
+	}
+
+// -----------------------------------------------------------------------------
+// CNokiaspotifyAppUi::~CNokiaspotifyAppUi()
+// Destructor.
+// -----------------------------------------------------------------------------
+//
+CNokiaspotifyAppUi::~CNokiaspotifyAppUi()
+	{
+	if (iAppView)
+		{
+		RemoveFromStack(iAppView);
+		delete iAppView;
+		iAppView = NULL;
+		}
+	delete iCacheManager;
+	iCacheManager = NULL;
+	delete iNetwork;
+	iNetwork = NULL;
+	delete iMusicService;
+	iMusicService = NULL;
+	delete iAudioPlayer;
+	iAudioPlayer = NULL;
+	iCurrentTracks.ResetAndDestroy();
+	iCurrentTracks.Close();
+	iPlaybackQueue.ResetAndDestroy();
+	iPlaybackQueue.Close();
+
+	}
+
+
+// -----------------------------------------------------------------------------
+// CNokiaspotifyAppUi::HandleCommandL()
+// Takes care of command handling.
+// -----------------------------------------------------------------------------
+//
+void CNokiaspotifyAppUi::HandleCommandL(TInt aCommand)
+	{
+	switch (aCommand)
+		{
+		case EEikCmdExit:
+		case EAknSoftkeyExit:
+			Exit();
+			break;
+
+		case ECommand1:
+			SearchMusicL();
+			break;
+		case ECommand2:
+			CreatePlaylistL();
+			break;
+		case EHelp:
+			ShowPlaylistsL();
+			break;
+		case ELogin:
+		case EConnectInternet:
+			ToggleInternetConnectionL();
+			break;
+		case EAbout:
+			AddTrackToPlaylistL();
+			break;
+		case EPlaylistOpen:
+			ShowPlaylistByNameL();
+			break;
+		case EPlaylistRemoveTrack:
+			RemoveTrackFromPlaylistL();
+			break;
+		case EPlaylistDelete:
+			DeletePlaylistL();
+			break;
+		case ELibraryReindex:
+			RebuildLocalLibraryIndexL();
+			break;
+		default:
+			// Do not Panic: the shell sends many command ids; unknown ones are OK.
+			break;
+		}
+	}
+
+void CNokiaspotifyAppUi::ShowWelcomeDialogL()
+	{
+	const TInt len = KinformationHead().Length() + KinformationText().Length() + 4;
+	HBufC* msg = HBufC::NewLC(len);
+	msg->Des().Copy(KinformationHead);
+	msg->Des().Append(_L("\n\n"));
+	msg->Des().Append(KinformationText);
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(*msg);
+	CleanupStack::PopAndDestroy(msg);
+	}
+
+void CNokiaspotifyAppUi::InitializeCacheManagerL()
+	{
+	delete iCacheManager;
+	iCacheManager = NULL;
+	iCacheManager = CTurboMusicCacheManager::NewL();
+	}
+
+void CNokiaspotifyAppUi::ResolveDataDir(TDes& aOut)
+	{
+	aOut.Copy((iCacheManager && iCacheManager->CacheDir().Length() > 0 &&
+		(iCacheManager->CacheDir()[0] == 'E' || iCacheManager->CacheDir()[0] == 'e'))
+		? KDataDirOnE
+		: KDataDirOnC);
+	}
+
+void CNokiaspotifyAppUi::ShowCacheStatusL()
+	{
+	if (!iCacheManager)
+		{
+		_LIT(KNoCache, "Cache manager nie jest zainicjalizowany.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoCache);
+		return;
+		}
+
+	iCacheManager->RecalculatePolicyL();
+	iCacheManager->TrimIfNeededL();
+	const TInt64 usedBytes = iCacheManager->CacheUsedBytesL();
+	const TInt64 limitBytes = iCacheManager->CacheLimitBytes();
+	const TInt usedMb = (TInt)(usedBytes / KOneMb);
+	const TInt limitMb = (TInt)(limitBytes / KOneMb);
+	const TDesC& cacheDir = iCacheManager->CacheDir();
+
+	_LIT(KFmt, "TurboMusic Cache\nFolder: %S\nUzycie: %d MB / %d MB\nPolityka: LRU (auto-clean)");
+	HBufC* text = HBufC::NewLC(256);
+	text->Des().Format(KFmt, &cacheDir, usedMb, limitMb);
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(*text);
+	CleanupStack::PopAndDestroy(text);
+	}
+
+void CNokiaspotifyAppUi::ShowAppStatusL()
+	{
+	const TBool online = (iNetwork && iNetwork->IsConnected());
+	const TInt err = (iNetwork ? iNetwork->LastError() : KErrNotReady);
+	_LIT(KFmt, "TurboMusic\nInternet: %S\nLast error: %d");
+	_LIT(KOn, "ON");
+	_LIT(KOff, "OFF");
+	HBufC* text = HBufC::NewLC(128);
+	text->Des().Format(KFmt, online ? &KOn : &KOff, err);
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(*text);
+	CleanupStack::PopAndDestroy(text);
+	}
+
+void CNokiaspotifyAppUi::ToggleInternetConnectionL()
+	{
+	if (!iNetwork)
+		{
+		_LIT(KNoNet, "Modul sieci niedostepny.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoNet);
+		return;
+		}
+
+	if (iNetwork->IsConnected())
+		{
+		iNetwork->Disconnect();
+		_LIT(KDisconnected, "Internet: ROZLACZONY");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KDisconnected);
+		return;
+		}
+
+	TRAPD(err, iNetwork->ConnectL());
+	if (err == KErrNone)
+		{
+		_LIT(KConnected, "Internet: POLACZONO");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KConnected);
+		}
+	else
+		{
+		_LIT(KConnFailFmt, "Blad polaczenia: %d");
+		HBufC* msg = HBufC::NewLC(64);
+		msg->Des().Format(KConnFailFmt, err);
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(*msg);
+		CleanupStack::PopAndDestroy(msg);
+		}
+	}
+
+void CNokiaspotifyAppUi::OpenOnlineSearchL(const TDesC& aQuery)
+	{
