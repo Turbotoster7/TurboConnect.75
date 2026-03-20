@@ -2292,3 +2292,119 @@ void CNokiaspotifyAppUi::ShowOperationErrorL(TInt aErr)
 		return;
 		}
 
+	HBufC* msg = HBufC::NewLC(64);
+	msg->Des().Format(KGenericFmt, aErr);
+	note->ExecuteLD(*msg);
+	CleanupStack::PopAndDestroy(msg);
+	}
+
+void CNokiaspotifyAppUi::CleanCacheL()
+	{
+	if (!iMusicService)
+		{
+		return;
+		}
+	const TInt removed = iMusicService->CleanCacheL();
+	_LIT(KCleanFmt, "Cache wyczyszczony. Plikow: %d");
+	HBufC* msg = HBufC::NewLC(96);
+	msg->Des().Format(KCleanFmt, removed);
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(*msg);
+	CleanupStack::PopAndDestroy(msg);
+	if (iAppView)
+		{
+		iAppView->ClearPlaybackPanel();
+		}
+	}
+
+void CNokiaspotifyAppUi::CreatePlaylistL()
+	{
+	TBuf<64> playlistName;
+	playlistName.Copy(_L("MojaPlaylista"));
+	_LIT(KPrompt, "Nazwa playlisty");
+	if (!PromptTextL(playlistName, KPrompt))
+		{
+		return;
+		}
+	if (playlistName.Length() == 0)
+		{
+		playlistName.Copy(_L("MojaPlaylista"));
+		}
+
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TFileName dataDir;
+	ResolveDataDir(dataDir);
+	EnsureFolderL(fs, dataDir);
+	TFileName playlistFile(dataDir);
+	playlistFile.Append(KPlaylistsFileName);
+
+	TBuf<128> line;
+	line.Append(playlistName);
+	line.Append(_L("|"));
+	AppendLineToTextFileL(fs, playlistFile, line);
+
+	_LIT(KOk, "Playlista utworzona.");
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(KOk);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CNokiaspotifyAppUi::AddTrackToPlaylistL()
+	{
+	TBuf<64> playlistName;
+	playlistName.Copy(_L("MojaPlaylista"));
+	_LIT(KPlaylistPrompt, "Playlista");
+	if (!PromptTextL(playlistName, KPlaylistPrompt))
+		{
+		return;
+		}
+	if (playlistName.Length() == 0)
+		{
+		playlistName.Copy(_L("MojaPlaylista"));
+		}
+
+	TBuf<128> trackName;
+	_LIT(KTrackPrompt, "Nazwa utworu");
+	PromptTextL(trackName, KTrackPrompt);
+	if (trackName.Length() == 0)
+		{
+		RFs fsAuto;
+		User::LeaveIfError(fsAuto.Connect());
+		CleanupClosePushL(fsAuto);
+		if (!FirstTrackNameL(fsAuto, trackName))
+			{
+			CleanupStack::PopAndDestroy(&fsAuto);
+			_LIT(KNoTrack, "Brak utworow lokalnych do dodania.");
+			CAknInformationNote* note = new (ELeave) CAknInformationNote;
+			note->ExecuteLD(KNoTrack);
+			return;
+			}
+		CleanupStack::PopAndDestroy(&fsAuto);
+		}
+
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TFileName dataDir;
+	ResolveDataDir(dataDir);
+	EnsureFolderL(fs, dataDir);
+	TFileName playlistFile(dataDir);
+	playlistFile.Append(KPlaylistsFileName);
+
+	TBuf<256> line;
+	line.Append(playlistName);
+	line.Append(_L("|"));
+	line.Append(trackName);
+	AppendLineToTextFileL(fs, playlistFile, line);
+
+	_LIT(KOk, "Utwor dodany do playlisty.");
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(KOk);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CNokiaspotifyAppUi::ShowPlaylistsL()
+	{
+	RFs fs;
