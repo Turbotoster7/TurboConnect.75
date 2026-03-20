@@ -2508,3 +2508,103 @@ void CNokiaspotifyAppUi::ShowPlaylistByNameL()
 		}
 	if (found == 0)
 		{
+		msg->Des().Append(_L("Brak utworow."));
+		}
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(*msg);
+	CleanupStack::PopAndDestroy(msg);
+	CleanupStack::PopAndDestroy(&lines);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CNokiaspotifyAppUi::RemoveTrackFromPlaylistL()
+	{
+	TBuf<64> playlistName;
+	playlistName.Copy(_L("MojaPlaylista"));
+	_LIT(KPlaylistPrompt, "Playlista");
+	if (!PromptTextL(playlistName, KPlaylistPrompt))
+		{
+		return;
+		}
+	if (playlistName.Length() == 0)
+		{
+		playlistName.Copy(_L("MojaPlaylista"));
+		}
+	TBuf<128> trackName;
+	_LIT(KTrackPrompt, "Utwor do usuniecia");
+	PromptTextL(trackName, KTrackPrompt);
+	if (trackName.Length() == 0)
+		{
+		_LIT(KNoTrackName, "Podaj nazwe utworu do usuniecia.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoTrackName);
+		return;
+		}
+
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TFileName dataDir;
+	ResolveDataDir(dataDir);
+	EnsureFolderL(fs, dataDir);
+	TFileName playlistFile(dataDir);
+	playlistFile.Append(KPlaylistsFileName);
+
+	RPointerArray<HBufC> lines;
+	CleanupStack::PushL(TCleanupItem(CleanupOwnedBufArray, &lines));
+	ReadTextFileLinesL(fs, playlistFile, lines);
+	RPointerArray<HBufC> keep;
+	CleanupStack::PushL(TCleanupItem(CleanupOwnedBufArray, &keep));
+
+	TInt removed = 0;
+	for (TInt i = 0; i < lines.Count(); ++i)
+		{
+		TPtrC line(*lines[i]);
+		const TInt sep = line.Locate('|');
+		if (sep <= 0)
+			{
+			AppendOwnedBufL(keep, line);
+			continue;
+			}
+		TPtrC left = line.Left(sep);
+		TPtrC right = line.Mid(sep + 1);
+		if (left.CompareF(playlistName) == 0 && right.CompareF(trackName) == 0)
+			{
+			++removed;
+			continue;
+			}
+		AppendOwnedBufL(keep, line);
+		}
+
+	RewriteTextFileL(fs, playlistFile, keep);
+	_LIT(KRemovedFmt, "Usunieto wpisow: %d");
+	HBufC* msg = HBufC::NewLC(64);
+	msg->Des().Format(KRemovedFmt, removed);
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(*msg);
+	CleanupStack::PopAndDestroy(msg);
+	CleanupStack::PopAndDestroy(&keep);
+	CleanupStack::PopAndDestroy(&lines);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CNokiaspotifyAppUi::DeletePlaylistL()
+	{
+	TBuf<64> playlistName;
+	playlistName.Copy(_L("MojaPlaylista"));
+	_LIT(KPrompt, "Usun playliste");
+	if (!PromptTextL(playlistName, KPrompt))
+		{
+		return;
+		}
+	if (playlistName.Length() == 0)
+		{
+		playlistName.Copy(_L("MojaPlaylista"));
+		}
+
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TFileName dataDir;
+	ResolveDataDir(dataDir);
+	EnsureFolderL(fs, dataDir);
