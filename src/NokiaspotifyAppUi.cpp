@@ -2408,3 +2408,103 @@ void CNokiaspotifyAppUi::AddTrackToPlaylistL()
 void CNokiaspotifyAppUi::ShowPlaylistsL()
 	{
 	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TFileName dataDir;
+	ResolveDataDir(dataDir);
+	TFileName playlistFile(dataDir);
+	playlistFile.Append(KPlaylistsFileName);
+
+	RPointerArray<HBufC> lines;
+	CleanupStack::PushL(TCleanupItem(CleanupOwnedBufArray, &lines));
+	ReadTextFileLinesL(fs, playlistFile, lines);
+	if (lines.Count() == 0)
+		{
+		_LIT(KNoPlaylists, "Brak playlist. Utworz nowa z menu.");
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(KNoPlaylists);
+		}
+	else
+		{
+		HBufC* msg = HBufC::NewLC(1024);
+		TPtr msgDes = msg->Des();
+		AppendLineLimited(msgDes, _L("Playlisty:"));
+		const TInt shown = (lines.Count() < 20) ? lines.Count() : 20;
+		for (TInt i = 0; i < shown; ++i)
+			{
+			TPtrC line(*lines[i]);
+			const TInt sep = line.Locate('|');
+			if (sep > 0)
+				{
+				AppendLimited(msgDes, line.Left(sep));
+				if (sep + 1 < line.Length())
+					{
+					AppendLimited(msgDes, _L(" -> "));
+					AppendLimited(msgDes, line.Mid(sep + 1));
+					}
+				AppendLimited(msgDes, _L("\n"));
+				}
+			}
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(*msg);
+		CleanupStack::PopAndDestroy(msg);
+		}
+
+	CleanupStack::PopAndDestroy(&lines);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CNokiaspotifyAppUi::ShowPlaylistByNameL()
+	{
+	TBuf<64> playlistName;
+	playlistName.Copy(_L("MojaPlaylista"));
+	_LIT(KPrompt, "Nazwa playlisty");
+	if (!PromptTextL(playlistName, KPrompt))
+		{
+		return;
+		}
+	if (playlistName.Length() == 0)
+		{
+		playlistName.Copy(_L("MojaPlaylista"));
+		}
+
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+	TFileName dataDir;
+	ResolveDataDir(dataDir);
+	TFileName playlistFile(dataDir);
+	playlistFile.Append(KPlaylistsFileName);
+
+	RPointerArray<HBufC> lines;
+	CleanupStack::PushL(TCleanupItem(CleanupOwnedBufArray, &lines));
+	ReadTextFileLinesL(fs, playlistFile, lines);
+
+	HBufC* msg = HBufC::NewLC(1024);
+	TPtr msgDes = msg->Des();
+	AppendLimited(msgDes, _L("Playlista: "));
+	AppendLimited(msgDes, playlistName);
+	AppendLimited(msgDes, _L("\n"));
+	TInt found = 0;
+	for (TInt i = 0; i < lines.Count(); ++i)
+		{
+		TPtrC line(*lines[i]);
+		const TInt sep = line.Locate('|');
+		if (sep <= 0)
+			{
+			continue;
+			}
+		TPtrC left = line.Left(sep);
+		TPtrC right = line.Mid(sep + 1);
+		if (left.CompareF(playlistName) == 0 && right.Length() > 0)
+			{
+			AppendLineLimited(msgDes, right);
+			++found;
+			if (found >= 20)
+				{
+				break;
+				}
+			}
+		}
+	if (found == 0)
+		{
