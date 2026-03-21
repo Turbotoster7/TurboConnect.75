@@ -2608,3 +2608,114 @@ void CNokiaspotifyAppUi::DeletePlaylistL()
 	TFileName dataDir;
 	ResolveDataDir(dataDir);
 	EnsureFolderL(fs, dataDir);
+	TFileName playlistFile(dataDir);
+	playlistFile.Append(KPlaylistsFileName);
+
+	RPointerArray<HBufC> lines;
+	CleanupStack::PushL(TCleanupItem(CleanupOwnedBufArray, &lines));
+	ReadTextFileLinesL(fs, playlistFile, lines);
+	RPointerArray<HBufC> keep;
+	CleanupStack::PushL(TCleanupItem(CleanupOwnedBufArray, &keep));
+
+	TInt removed = 0;
+	for (TInt i = 0; i < lines.Count(); ++i)
+		{
+		TPtrC line(*lines[i]);
+		const TInt sep = line.Locate('|');
+		if (sep <= 0)
+			{
+			AppendOwnedBufL(keep, line);
+			continue;
+			}
+		TPtrC left = line.Left(sep);
+		if (left.CompareF(playlistName) == 0)
+			{
+			++removed;
+			continue;
+			}
+		AppendOwnedBufL(keep, line);
+		}
+
+	RewriteTextFileL(fs, playlistFile, keep);
+	_LIT(KDeletedFmt, "Usunieto playlist entries: %d");
+	HBufC* msg = HBufC::NewLC(64);
+	msg->Des().Format(KDeletedFmt, removed);
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(*msg);
+	CleanupStack::PopAndDestroy(msg);
+	CleanupStack::PopAndDestroy(&keep);
+	CleanupStack::PopAndDestroy(&lines);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CNokiaspotifyAppUi::RebuildLocalLibraryIndexL()
+	{
+	RFs fs;
+	User::LeaveIfError(fs.Connect());
+	CleanupClosePushL(fs);
+
+	TFileName dataDir;
+	ResolveDataDir(dataDir);
+	EnsureFolderL(fs, dataDir);
+	TFileName indexFile(dataDir);
+	indexFile.Append(KLibraryIndexFileName);
+
+	RPointerArray<HBufC> lines;
+	CleanupStack::PushL(TCleanupItem(CleanupOwnedBufArray, &lines));
+
+	CDir* dir = NULL;
+	TFileName pattern(KMusicDirE);
+	pattern.Append(_L("*.mp3"));
+	if (fs.GetDir(pattern, KEntryAttNormal, ESortByName, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			TFileName path(KMusicDirE);
+			path.Append((*dir)[i].iName);
+			AppendOwnedBufL(lines, path);
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+
+	dir = NULL;
+	TFileName patternE2(KMusicDirE);
+	patternE2.Append(_L("*.m4a"));
+	if (fs.GetDir(patternE2, KEntryAttNormal, ESortByName, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			TFileName path(KMusicDirE);
+			path.Append((*dir)[i].iName);
+			AppendOwnedBufL(lines, path);
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+
+	dir = NULL;
+	TFileName pattern2(KMusicDirC);
+	pattern2.Append(_L("*.mp3"));
+	if (fs.GetDir(pattern2, KEntryAttNormal, ESortByName, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			TFileName path(KMusicDirC);
+			path.Append((*dir)[i].iName);
+			AppendOwnedBufL(lines, path);
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+
+	dir = NULL;
+	TFileName patternC2(KMusicDirC);
+	patternC2.Append(_L("*.m4a"));
+	if (fs.GetDir(patternC2, KEntryAttNormal, ESortByName, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			TFileName path(KMusicDirC);
+			path.Append((*dir)[i].iName);
+			AppendOwnedBufL(lines, path);
