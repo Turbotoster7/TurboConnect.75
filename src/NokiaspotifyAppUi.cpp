@@ -3029,3 +3029,110 @@ void CNokiaspotifyAppUi::HandleDeleteTrackFromViewL(TInt aIndex)
 				--iPlaybackIndex;
 				}
 			}
+		}
+	if (iAppView)
+		{
+		iAppView->ClearPlaybackPanel();
+		}
+	if (iCurrentTracks.Count() == 0)
+		{
+		iCurrentPlaybackName.Zero();
+		StopPlayback();
+		if (iAppView)
+			{
+			iAppView->ShowHomeScreen();
+			}
+		return;
+		}
+	TRAP_IGNORE(ShowCurrentTrackListL(iCurrentTrackListTitle));
+	}
+
+void CNokiaspotifyAppUi::HandleOpenNowPlayingFromViewL()
+	{
+	TRAP_IGNORE(OpenNowPlayingScreenL());
+	}
+
+void CNokiaspotifyAppUi::HandlePlaybackPrevFromViewL()
+	{
+	const TInt prev = ResolvePrevQueueIndex();
+	if (prev != KErrNotFound)
+		{
+		TRAP_IGNORE(PlayQueueIndexL(prev));
+		}
+	}
+
+void CNokiaspotifyAppUi::HandlePlaybackToggleFromViewL()
+	{
+	if (iCurrentPlaybackName.Length() == 0)
+		{
+		return;
+		}
+	if (iAudioPlayer && iAudioPlaying)
+		{
+		StopPlayback();
+		return;
+		}
+	if (iPlaybackIndex != KErrNotFound)
+		{
+		TRAP_IGNORE(PlayQueueIndexL(iPlaybackIndex));
+		}
+	}
+
+void CNokiaspotifyAppUi::HandlePlaybackNextFromViewL()
+	{
+	const TInt next = ResolveNextQueueIndex();
+	if (next != KErrNotFound)
+		{
+		TRAP_IGNORE(PlayQueueIndexL(next));
+		}
+	}
+
+void CNokiaspotifyAppUi::HandlePlaybackShuffleFromViewL()
+	{
+	ToggleShuffle();
+	}
+
+void CNokiaspotifyAppUi::ShowLoginInfoL()
+	{
+	_LIT(KLoginInfo, "TurboMusic: bez logowania. Otworz cache status klawiszem OK.");
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(KLoginInfo);
+	}
+// -----------------------------------------------------------------------------
+//  Called by the framework when the application status pane
+//  size is changed.  Passes the new client rectangle to the
+//  AppView
+// -----------------------------------------------------------------------------
+//
+void CNokiaspotifyAppUi::HandleStatusPaneSizeChange()
+	{
+	if (iAppView)
+		{
+		iAppView->SetRect(ClientRect());
+		}
+	}
+
+CArrayFix<TCoeHelpContext>* CNokiaspotifyAppUi::HelpContextL() const
+	{
+//#warning "Please see comment about help and UID3..."
+	// Note: Help will not work if the application uid3 is not in the
+	// protected range.  The default uid3 range for projects created
+	// from this template (0xE0000000 - 0xEFFFFFFF) are not in the protected range so that they
+	// can be self signed and installed on the device during testing.
+	// Once you get your official uid3 from Symbian Ltd. and find/replace
+	// all occurrences of uid3 in your project, the context help will
+	// work. Alternatively, a patch now exists for the versions of
+	// HTML help compiler in SDKs and can be found here along with an FAQ:
+	// http://www3.symbian.com/faq.nsf/AllByDate/E9DF3257FD565A658025733900805EA2?OpenDocument
+#ifdef _HELP_AVAILABLE_
+	CArrayFixFlat<TCoeHelpContext>* array = new(ELeave)CArrayFixFlat<TCoeHelpContext>(1);
+	CleanupStack::PushL(array);
+//	array->AppendL(TCoeHelpContext(KUidNokiaspotifyApp, KGeneral_Information));
+	CleanupStack::Pop(array);
+	return array;
+#else
+	return NULL;
+#endif
+	}
+
+// End of File
