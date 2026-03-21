@@ -2719,3 +2719,212 @@ void CNokiaspotifyAppUi::RebuildLocalLibraryIndexL()
 			TFileName path(KMusicDirC);
 			path.Append((*dir)[i].iName);
 			AppendOwnedBufL(lines, path);
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+
+	dir = NULL;
+	TFileName pattern3(KTurboMusicDirE);
+	pattern3.Append(_L("*.mp3"));
+	if (fs.GetDir(pattern3, KEntryAttNormal, ESortByName, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			TFileName path(KTurboMusicDirE);
+			path.Append((*dir)[i].iName);
+			AppendOwnedBufL(lines, path);
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+
+	dir = NULL;
+	TFileName pattern4(KTurboMusicDirE);
+	pattern4.Append(_L("*.m4a"));
+	if (fs.GetDir(pattern4, KEntryAttNormal, ESortByName, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			TFileName path(KTurboMusicDirE);
+			path.Append((*dir)[i].iName);
+			AppendOwnedBufL(lines, path);
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+
+	dir = NULL;
+	TFileName pattern5(KTurboMusicDirC);
+	pattern5.Append(_L("*.mp3"));
+	if (fs.GetDir(pattern5, KEntryAttNormal, ESortByName, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			TFileName path(KTurboMusicDirC);
+			path.Append((*dir)[i].iName);
+			AppendOwnedBufL(lines, path);
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+
+	dir = NULL;
+	TFileName pattern6(KTurboMusicDirC);
+	pattern6.Append(_L("*.m4a"));
+	if (fs.GetDir(pattern6, KEntryAttNormal, ESortByName, dir) == KErrNone)
+		{
+		CleanupStack::PushL(dir);
+		for (TInt i = 0; i < dir->Count(); ++i)
+			{
+			TFileName path(KTurboMusicDirC);
+			path.Append((*dir)[i].iName);
+			AppendOwnedBufL(lines, path);
+			}
+		CleanupStack::PopAndDestroy(dir);
+		}
+
+	RewriteTextFileL(fs, indexFile, lines);
+
+	_LIT(KDoneFmt, "Indeks biblioteki odswiezony. Utworow: %d");
+	HBufC* msg = HBufC::NewLC(96);
+	msg->Des().Format(KDoneFmt, lines.Count());
+	CAknInformationNote* note = new (ELeave) CAknInformationNote;
+	note->ExecuteLD(*msg);
+	CleanupStack::PopAndDestroy(msg);
+	CleanupStack::PopAndDestroy(&lines);
+	CleanupStack::PopAndDestroy(&fs);
+	}
+
+void CNokiaspotifyAppUi::HandleLoginFromViewL()
+	{
+	TRAP_IGNORE(ShowAppStatusL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickSearchFromViewL()
+	{
+	if (iAppView)
+		{
+		iAppView->BeginInlineSearchInputL(EFalse);
+		return;
+		}
+	TRAP_IGNORE(SearchMusicL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickCreatePlaylistFromViewL()
+	{
+	TRAP_IGNORE(CreatePlaylistL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickAddTrackToPlaylistFromViewL()
+	{
+	TRAP_IGNORE(AddTrackToPlaylistL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickShowPlaylistsFromViewL()
+	{
+	TRAP_IGNORE(ShowPlaylistsL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickToggleInternetFromViewL()
+	{
+	TRAP_IGNORE(ToggleInternetConnectionL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickOpenPlaylistFromViewL()
+	{
+	TRAP_IGNORE(ShowPlaylistByNameL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickReindexLibraryFromViewL()
+	{
+	TRAP_IGNORE(RebuildLocalLibraryIndexL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickPingFromViewL()
+	{
+	TRAPD(err, PingServerL());
+	if (err != KErrNone)
+		{
+		_LIT(KPingErr, "Ping blad: %d");
+		HBufC* msg = HBufC::NewLC(64);
+		msg->Des().Format(KPingErr, err);
+		CAknInformationNote* note = new (ELeave) CAknInformationNote;
+		note->ExecuteLD(*msg);
+		CleanupStack::PopAndDestroy(msg);
+		}
+	}
+
+void CNokiaspotifyAppUi::HandleQuickOnlineSearchFromViewL()
+	{
+	if (iAppView)
+		{
+		iAppView->BeginInlineSearchInputL(ETrue);
+		return;
+		}
+	TRAP_IGNORE(SearchMusicOnlineL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickShowTrackListFromViewL()
+	{
+	TRAP_IGNORE(ShowTrackListL());
+	}
+
+void CNokiaspotifyAppUi::HandleQuickCleanCacheFromViewL()
+	{
+	TRAP_IGNORE(CleanCacheL());
+	}
+
+void CNokiaspotifyAppUi::HandleInlineSearchQueryFromViewL(const TDesC& aQuery)
+	{
+	TRAPD(err, SearchMusicByQueryL(aQuery));
+	if (err != KErrNone)
+		{
+		TRAP_IGNORE(ShowOperationErrorL(err));
+		return;
+		}
+	if (iCurrentTracks.Count() > 0)
+		{
+		HandleTrackChosenFromViewL(0);
+		}
+	}
+
+void CNokiaspotifyAppUi::HandleInlineOnlineSearchQueryFromViewL(const TDesC& aQuery)
+	{
+	TRAPD(err, SearchMusicOnlineByQueryL(aQuery));
+	if (err != KErrNone)
+		{
+		TRAP_IGNORE(ShowOperationErrorL(err));
+		return;
+		}
+	if (iCurrentTracks.Count() > 0)
+		{
+		HandleTrackChosenFromViewL(0);
+		}
+	}
+
+void CNokiaspotifyAppUi::HandleTrackChosenFromViewL(TInt aIndex)
+	{
+	if (aIndex < 0 || aIndex >= iCurrentTracks.Count() || !iMusicService || !iCurrentTracks[aIndex])
+		{
+		return;
+		}
+	TRAPD(err, {
+		CopyCurrentTracksToPlaybackQueueL();
+		PlayQueueIndexL(aIndex);
+	});
+	if (err != KErrNone)
+		{
+		TRAP_IGNORE(ShowOperationErrorL(err));
+		}
+	}
+
+void CNokiaspotifyAppUi::HandleSaveTrackFromViewL(TInt aIndex)
+	{
+	if (aIndex < 0 || aIndex >= iCurrentTracks.Count() || !iMusicService || !iCurrentTracks[aIndex])
+		{
+		return;
+		}
+	TRAPD(err, {
+		TFileName oldLocalPath;
+		if (iCurrentTracks[aIndex]->iLocalPath)
+			{
