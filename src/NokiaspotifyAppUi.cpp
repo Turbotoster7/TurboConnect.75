@@ -2928,3 +2928,104 @@ void CNokiaspotifyAppUi::HandleSaveTrackFromViewL(TInt aIndex)
 		TFileName oldLocalPath;
 		if (iCurrentTracks[aIndex]->iLocalPath)
 			{
+			oldLocalPath.Copy(*iCurrentTracks[aIndex]->iLocalPath);
+			}
+		TBuf<128> oldFileName;
+		if (iCurrentTracks[aIndex]->iFileName)
+			{
+			oldFileName.Copy(iCurrentTracks[aIndex]->iFileName->Left(oldFileName.MaxLength()));
+			}
+		TBuf<256> oldRemoteUrl;
+		if (iCurrentTracks[aIndex]->iRemoteUrl)
+			{
+			oldRemoteUrl.Copy(iCurrentTracks[aIndex]->iRemoteUrl->Left(oldRemoteUrl.MaxLength()));
+			}
+		iMusicService->SaveTrackPermanentL(*iCurrentTracks[aIndex]);
+		for (TInt i = 0; i < iPlaybackQueue.Count(); ++i)
+			{
+			if (!iPlaybackQueue[i])
+				{
+				continue;
+				}
+			const TBool sameLocal = (oldLocalPath.Length() > 0 && iPlaybackQueue[i]->iLocalPath &&
+				iPlaybackQueue[i]->iLocalPath->CompareF(oldLocalPath) == 0);
+			const TBool sameFile = (oldFileName.Length() > 0 && iPlaybackQueue[i]->iFileName &&
+				iPlaybackQueue[i]->iFileName->CompareF(oldFileName) == 0);
+			const TBool sameRemote = (oldRemoteUrl.Length() > 0 && iPlaybackQueue[i]->iRemoteUrl &&
+				iPlaybackQueue[i]->iRemoteUrl->CompareF(oldRemoteUrl) == 0);
+			if (!sameLocal && !sameFile && !sameRemote)
+				{
+				continue;
+				}
+			if (iCurrentTracks[aIndex]->iLocalPath)
+				{
+				iPlaybackQueue[i]->SetLocalPathL(*iCurrentTracks[aIndex]->iLocalPath);
+				}
+			if (iCurrentTracks[aIndex]->iFileName)
+				{
+				iPlaybackQueue[i]->SetFileNameL(*iCurrentTracks[aIndex]->iFileName);
+				}
+			if (iCurrentTracks[aIndex]->iDisplay)
+				{
+				iPlaybackQueue[i]->SetDisplayL(*iCurrentTracks[aIndex]->iDisplay);
+				}
+			iPlaybackQueue[i]->iPermanent = iCurrentTracks[aIndex]->iPermanent;
+			iPlaybackQueue[i]->iCached = iCurrentTracks[aIndex]->iCached;
+			iPlaybackQueue[i]->iOnlineOnly = iCurrentTracks[aIndex]->iOnlineOnly;
+			}
+		if (oldFileName.Length() > 0 && iCurrentPlaybackName.CompareF(oldFileName) == 0)
+			{
+			iCurrentPlaybackName.Copy(oldFileName);
+			iCurrentTrackFromInternet = EFalse;
+			UpdatePlaybackUi();
+			}
+		ShowCurrentTrackListL(iCurrentTrackListTitle);
+	});
+	if (err != KErrNone)
+		{
+		TRAP_IGNORE(ShowOperationErrorL(err));
+		}
+	}
+
+void CNokiaspotifyAppUi::HandleDeleteTrackFromViewL(TInt aIndex)
+	{
+	if (aIndex < 0 || aIndex >= iCurrentTracks.Count() || !iMusicService || !iCurrentTracks[aIndex])
+		{
+		return;
+		}
+	TFileName deletedPath;
+	if (iCurrentTracks[aIndex]->iLocalPath)
+		{
+		deletedPath.Copy(*iCurrentTracks[aIndex]->iLocalPath);
+		}
+
+	TRAPD(err, iMusicService->DeleteTrackL(*iCurrentTracks[aIndex]));
+	if (err != KErrNone)
+		{
+		TRAP_IGNORE(ShowOperationErrorL(err));
+		return;
+		}
+
+	delete iCurrentTracks[aIndex];
+	iCurrentTracks.Remove(aIndex);
+	for (TInt i = iPlaybackQueue.Count() - 1; i >= 0; --i)
+		{
+		if (!iPlaybackQueue[i] || !iPlaybackQueue[i]->iLocalPath || deletedPath.Length() == 0)
+			{
+			continue;
+			}
+		if (iPlaybackQueue[i]->iLocalPath->CompareF(deletedPath) == 0)
+			{
+			delete iPlaybackQueue[i];
+			iPlaybackQueue.Remove(i);
+			if (iPlaybackIndex == i)
+				{
+				iPlaybackIndex = KErrNotFound;
+				iCurrentPlaybackName.Zero();
+				StopPlayback();
+				}
+			else if (iPlaybackIndex > i)
+				{
+				--iPlaybackIndex;
+				}
+			}
