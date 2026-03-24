@@ -214,3 +214,112 @@ def healthz():
         "requests": getattr(_requests, "__version__", None) if _requests else None,
         "yt_dlp": getattr(getattr(_yt_dlp, "version", None), "__version__", None) if _yt_dlp else None,
         "ffmpeg": _get_ffmpeg_path(),
+        "users_file": str(USERS_FILE),
+        "users_file_exists": USERS_FILE.exists(),
+        "spotify_client_credentials": bool(_spotify_client_credentials()),
+        "secret_file_exists": SECRET_FILE.exists(),
+        "music_dir_writable": os.access(MUSIC_DIR, os.W_OK),
+        "zips_dir_writable": os.access(ZIPS_DIR, os.W_OK),
+        "errors": {
+            "requests": str(_REQUESTS_IMPORT_ERROR) if _REQUESTS_IMPORT_ERROR else None,
+            "yt_dlp": str(_YT_DLP_IMPORT_ERROR) if _YT_DLP_IMPORT_ERROR else None,
+        },
+    }
+    return info
+
+def _get_ffmpeg_path():
+    """Szuka FFmpeg najpierw w folderze aplikacji, potem w systemie."""
+    local_ffmpeg = BASE_DIR / "ffmpeg"
+    if local_ffmpeg.exists() and os.access(local_ffmpeg, os.X_OK):
+        return str(local_ffmpeg)
+    return shutil.which("ffmpeg")
+
+
+def _load_playlists() -> dict:
+    if not PLAYLISTS_FILE.exists():
+        return {"playlists": []}
+    try:
+        return json.loads(PLAYLISTS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {"playlists": []}
+
+
+def _save_playlists(data: dict) -> None:
+    PLAYLISTS_FILE.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _find_playlist(data: dict, playlist_id: str) -> dict | None:
+    for p in data.get("playlists", []):
+        if p.get("id") == playlist_id:
+            return p
+    return None
+
+def _track_id_for_relpath(rel_posix: str) -> str:
+    return hashlib.sha256(rel_posix.encode("utf-8")).hexdigest()[:16]
+
+def _iter_audio():
+    if not MUSIC_DIR.is_dir():
+        return
+    # Szukamy mp3 i m4a
+    for ext in ("*.mp3", "*.m4a"):
+        for path in sorted(MUSIC_DIR.rglob(ext)):
+            if path.is_file():
+                try:
+                    rel = path.relative_to(MUSIC_DIR)
+                    rel_posix = rel.as_posix()
+                    yield path, rel_posix, _track_id_for_relpath(rel_posix)
+                except ValueError:
+                    continue
+
+def _path_for_track_id(tid: str) -> Path | None:
+    for path, _rel, i in _iter_audio():
+        if i == tid:
+            return path
+    return None
+
+
+def _all_tracks() -> list[dict]:
+    tracks: list[dict] = []
+    for path, rel_posix, tid in _iter_audio():
+        mime = _sniff_audio_mimetype(path)
+        suf = _stream_url_suffix(mime)
+        tracks.append(
+            {
+                "id": tid,
+                "title": path.stem.replace("_", " "),
+                "filename": path.name,
+                "rel": rel_posix,
+                "path": path,
+                "stream_url": f"/library/stream/{tid}{suf}",
+                "download_url": f"/library/file/{tid}{suf}",
+            }
+        )
+    return tracks
+
+def _sniff_audio_mimetype(path: Path) -> str:
+    try:
+        with path.open("rb") as f:
+            head = f.read(16)
+    except OSError:
+        head = b""
+    if len(head) >= 8 and head[4:8] == b"ftyp":
+        return "audio/mp4"
+    if head[:3] == b"ID3" or (len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0):
+        return "audio/mpeg"
+    if head[:4] == b"RIFF" and len(head) >= 12 and head[8:12] == b"WAVE":
+        return "audio/wav"
+    return "application/octet-stream"
+
+def _stream_url_suffix(mimetype: str) -> str:
+    if mimetype == "audio/mp4": return ".m4a"
+    if mimetype == "audio/mpeg": return ".mp3"
+    return ".bin"
+
+def _normalize_stream_track_id(raw: str) -> str:
+    for ext in (".mp3", ".m4a", ".webm", ".bin", ".MP3", ".M4A"):
+        if raw.endswith(ext):
+            return raw[: -len(ext)]
+    return raw
