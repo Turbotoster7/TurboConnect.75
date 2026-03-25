@@ -323,3 +323,197 @@ def _normalize_stream_track_id(raw: str) -> str:
         if raw.endswith(ext):
             return raw[: -len(ext)]
     return raw
+
+def _ascii_download_name(path: Path) -> str:
+    name = path.name.replace('"', "").replace("\\", "")[:120]
+    return name if re.fullmatch(r"[\x20-\x7e]+", name) else f"track{path.suffix}"
+
+def _convert_m4a_library_to_mp3(delete_source: bool = False) -> tuple[int, int, list[str]]:
+    converted, failed, messages = 0, 0, []
+    ffmpeg_bin = _get_ffmpeg_path()
+
+    if not ffmpeg_bin:
+        return 0, 0, ["FFmpeg not found on server (including local binary)."]
+
+    for src in sorted(MUSIC_DIR.rglob("*.m4a")):
+        dst = src.with_suffix(".mp3")
+        if dst.exists(): continue
+
+        cmd = [ffmpeg_bin, "-y", "-i", str(src), "-vn", "-acodec", "libmp3lame", "-b:a", "128k", str(dst)]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            converted += 1
+            if delete_source: src.unlink()
+        else:
+            failed += 1
+            messages.append(f"BLAD: {src.name}")
+    return converted, failed, messages
+
+def _clean_string(text: str) -> str:
+    return re.sub(r'[^a-zA-Z0-9]', '', text).lower()
+
+
+def _ydl_opts_for_library(target_dir: Path) -> dict:
+    """Bazowa konfiguracja yt-dlp z opcjonalnym FFmpeg."""
+    ffmpeg_bin = _get_ffmpeg_path()
+    opts: dict = {
+        "outtmpl": str(target_dir / "%(title)s.%(ext)s"),
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "ignoreerrors": False,
+        "default_search": "ytsearch1",
+        "socket_timeout": 30,
+        "retries": 2,
+        "fragment_retries": 2,
+    }
+    if ffmpeg_bin:
+        opts["ffmpeg_location"] = ffmpeg_bin
+        opts["format"] = "bestaudio/best"
+        opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "128",
+        }]
+    else:
+        opts["format"] = "bestaudio[ext=mp3]/best[ext=mp3]/bestaudio[acodec*=mp3]/best[acodec*=mp3]"
+    return opts
+
+
+def _download_track(query: str, target_dir: Path, deadline_s: float = 120.0) -> Path:
+    """Pobiera jeden utwor przez yt-dlp do target_dir i zwraca sciezke do pliku."""
+    target_dir.mkdir(parents=True, exist_ok=True)
+    opts = _ydl_opts_for_library(target_dir)
+    ytdl_mod = _require_yt_dlp()
+
+    deadline = time.monotonic() + deadline_s
+
+    def _check_deadline(d: dict) -> None:
+        if time.monotonic() > deadline:
+            raise ytdl_mod.utils.DownloadError("timeout pobierania utworu")
+
+    opts["progress_hooks"] = [_check_deadline]
+
+    try:
+        with ytdl_mod.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=True)
+    except ytdl_mod.utils.DownloadError as e:
+        raise RuntimeError(str(e)) from e
+    if not info:
+        raise RuntimeError("brak wynikow")
+    if "entries" in info and info["entries"]:
+        info = info["entries"][0]
+
+    candidate_paths: list[Path] = []
+    rd = info.get("requested_downloads") or []
+    for d in rd:
+        fp = d.get("filepath") or d.get("filename")
+        if fp:
+            candidate_paths.append(Path(fp))
+    if not candidate_paths:
+        ydl_filename = info.get("_filename") or info.get("filename")
+        if ydl_filename:
+            candidate_paths.append(Path(ydl_filename))
+
+    if _get_ffmpeg_path():
+        for p in list(candidate_paths):
+            mp3 = p.with_suffix(".mp3")
+            if mp3.exists():
+                candidate_paths.insert(0, mp3)
+
+    for p in candidate_paths:
+        if p.is_file():
+            return p
+
+    raise RuntimeError("nie znaleziono pobranego pliku")
+
+
+def _spotify_playlist_id(url: str) -> str | None:
+    m = SPOTIFY_PLAYLIST_RE.search(url or "")
+    return m.group(1) if m else None
+
+
+_SPOTIFY_UA = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
+
+# Cache na token Client Credentials (1 godzina waznosci)
+_SPOTIFY_CC_TOKEN: dict = {"token": None, "expires_at": 0.0}
+
+
+def _spotify_client_credentials() -> tuple[str, str] | None:
+    """Zwraca (client_id, client_secret) z env-ow albo None."""
+    cid = (os.environ.get("SPOTIFY_CLIENT_ID") or os.environ.get("SPOTIPY_CLIENT_ID") or "").strip()
+    csec = (os.environ.get("SPOTIFY_CLIENT_SECRET") or os.environ.get("SPOTIPY_CLIENT_SECRET") or "").strip()
+    if cid and csec:
+        return cid, csec
+    return None
+
+
+def _spotify_token_client_credentials(req) -> str:
+    """Pobiera token przez oficjalny Client Credentials Flow.
+
+    Wymaga zmiennych SPOTIFY_CLIENT_ID i SPOTIFY_CLIENT_SECRET
+    (zalozenie aplikacji na https://developer.spotify.com/dashboard).
+    """
+    creds = _spotify_client_credentials()
+    if not creds:
+        raise RuntimeError(
+            "missing SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET — "
+            "zaloz darmowa aplikacje na https://developer.spotify.com/dashboard "
+            "i wstaw klucze w panelu Pythona (Environment Variables)"
+        )
+
+    now = time.time()
+    cache = _SPOTIFY_CC_TOKEN
+    if cache.get("token") and cache.get("expires_at", 0) - 30 > now:
+        return cache["token"]
+
+    cid, csec = creds
+    import base64
+    basic = base64.b64encode(f"{cid}:{csec}".encode("utf-8")).decode("ascii")
+    r = req.post(
+        "https://accounts.spotify.com/api/token",
+        headers={
+            "Authorization": f"Basic {basic}",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": _SPOTIFY_UA,
+        },
+        data={"grant_type": "client_credentials"},
+        timeout=15,
+    )
+    if r.status_code != 200:
+        raise RuntimeError(f"token endpoint zwrocil HTTP {r.status_code}: {r.text[:200]}")
+    payload = r.json()
+    tok = payload.get("access_token")
+    if not tok:
+        raise RuntimeError("token endpoint nie zwrocil access_token")
+    cache["token"] = tok
+    cache["expires_at"] = now + float(payload.get("expires_in", 3600))
+    return tok
+
+
+def _spotify_token_from_page(req, pid: str) -> str:
+    """Pobiera anonimowy access token z glownej strony playlisty open.spotify.com.
+
+    Spotify wstawia w HTML <script id="session"> z JSON-em zawierajacym 'accessToken'.
+    To te same dane co loaduje web player.
+    """
+    url = f"https://open.spotify.com/playlist/{pid}"
+    headers = {
+        "User-Agent": _SPOTIFY_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    r = req.get(url, headers=headers, timeout=20)
+    if r.status_code != 200:
+        raise RuntimeError(f"strona playlisty zwrocila HTTP {r.status_code}")
+
+    html = r.text
+    patterns = [
+        r'<script[^>]+id="session"[^>]*>\s*(\{.*?\})\s*</script>',
+        r'<script[^>]+id="config"[^>]*>\s*(\{.*?\})\s*</script>',
+    ]
+    for pat in patterns:
+        m = re.search(pat, html, re.DOTALL)
