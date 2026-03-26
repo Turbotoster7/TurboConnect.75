@@ -517,3 +517,120 @@ def _spotify_token_from_page(req, pid: str) -> str:
     ]
     for pat in patterns:
         m = re.search(pat, html, re.DOTALL)
+        if not m:
+            continue
+        try:
+            payload = json.loads(m.group(1))
+        except json.JSONDecodeError:
+            continue
+        tok = payload.get("accessToken") or payload.get("access_token")
+        if tok:
+            return tok
+
+    m = re.search(r'"accessToken"\s*:\s*"([A-Za-z0-9._\-]+)"', html)
+    if m:
+        return m.group(1)
+
+    raise RuntimeError("nie znaleziono accessToken na stronie playlisty (Spotify zmienil format?)")
+
+
+def _spotify_get_token(req, pid: str) -> tuple[str, str]:
+    """Zwraca (token, source) - 'cc' lub 'page'."""
+    if _spotify_client_credentials():
+        return _spotify_token_client_credentials(req), "cc"
+    return _spotify_token_from_page(req, pid), "page"
+
+
+def _spotify_extract_tracks(items: list) -> list[dict]:
+    out: list[dict] = []
+    for item in items or []:
+        t = (item or {}).get("track") or {}
+        if not isinstance(t, dict):
+            continue
+        title = (t.get("name") or "").strip()
+        artists = t.get("artists") or []
+        artist = ", ".join(a.get("name", "") for a in artists if isinstance(a, dict)).strip()
+        if title:
+            out.append({"title": title, "artist": artist})
+    return out
+
+
+def _spotify_via_api(req, pid: str) -> tuple[str, list[dict]]:
+    """Pobiera playliste przez oficjalne Spotify Web API.
+
+    Spotify od 2024 r. drastycznie ograniczyl, co dostaje aplikacja
+    z Client Credentials (czasem oddaje playliste z pusta tracks.items).
+    Probujemy roznych URL-i + roznych marketow i odpadamy z konkretnym
+    komunikatem (z tracks.total) gdy nic nie zwraca utworow.
+    """
+    token, _src = _spotify_get_token(req, pid)
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": _SPOTIFY_UA,
+    }
+
+    market_env = (os.environ.get("SPOTIFY_MARKET") or "").strip()
+    markets: list[str] = []
+    for m in [market_env, "PL", "US", "GB", "from_token", ""]:
+        if m not in markets:
+            markets.append(m)
+
+    attempts: list[str] = []
+    last_name = "Spotify Playlist"
+    last_total: int | None = None
+
+    base = f"https://api.spotify.com/v1/playlists/{pid}"
+    for market in markets:
+        suffix = f"?market={market}" if market else ""
+        url = base + suffix
+        try:
+            r = req.get(url, headers=headers, timeout=25)
+        except Exception as e:
+            attempts.append(f"GET {url}: {e}")
+            continue
+
+        if r.status_code != 200:
+            attempts.append(f"GET {url} -> HTTP {r.status_code}: {r.text[:140]}")
+            continue
+
+        try:
+            payload = r.json()
+        except Exception as e:
+            attempts.append(f"GET {url}: bad JSON: {e}")
+            continue
+
+        last_name = (payload.get("name") or last_name).strip()
+        tracks_block = payload.get("tracks") or {}
+        last_total = tracks_block.get("total")
+        tracks = _spotify_extract_tracks(tracks_block.get("items") or [])
+
+        next_url = tracks_block.get("next")
+        while next_url and len(tracks) < (last_total or 1000):
+            try:
+                rr = req.get(next_url, headers=headers, timeout=25)
+            except Exception as e:
+                attempts.append(f"next {next_url}: {e}")
+                break
+            if rr.status_code != 200:
+                attempts.append(f"next {next_url} -> HTTP {rr.status_code}")
+                break
+            page = rr.json()
+            tracks.extend(_spotify_extract_tracks(page.get("items") or []))
+            next_url = page.get("next")
+
+        if tracks:
+            return last_name, tracks
+
+        attempts.append(
+            f"GET {url} -> HTTP 200, name='{last_name}', tracks.total={last_total}, items=0"
+        )
+
+    for market in markets:
+        suffix = f"?market={market}&limit=100" if market else "?limit=100"
+        url = base + "/tracks" + suffix
+        try:
+            r = req.get(url, headers=headers, timeout=25)
+        except Exception as e:
+            attempts.append(f"GET {url}: {e}")
+            continue
