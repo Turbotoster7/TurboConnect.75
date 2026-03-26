@@ -634,3 +634,116 @@ def _spotify_via_api(req, pid: str) -> tuple[str, list[dict]]:
         except Exception as e:
             attempts.append(f"GET {url}: {e}")
             continue
+
+        if r.status_code != 200:
+            attempts.append(f"GET {url} -> HTTP {r.status_code}: {r.text[:140]}")
+            continue
+
+        try:
+            payload = r.json()
+        except Exception as e:
+            attempts.append(f"GET {url}: bad JSON: {e}")
+            continue
+
+        last_total = payload.get("total") if last_total is None else last_total
+        tracks = _spotify_extract_tracks(payload.get("items") or [])
+        next_url = payload.get("next")
+        while next_url:
+            try:
+                rr = req.get(next_url, headers=headers, timeout=25)
+            except Exception as e:
+                attempts.append(f"next {next_url}: {e}")
+                break
+            if rr.status_code != 200:
+                attempts.append(f"next {next_url} -> HTTP {rr.status_code}")
+                break
+            page = rr.json()
+            tracks.extend(_spotify_extract_tracks(page.get("items") or []))
+            next_url = page.get("next")
+
+        if tracks:
+            return last_name, tracks
+
+        attempts.append(f"GET {url} -> HTTP 200 ale items=0 (total={last_total})")
+
+    msg_total = f"Spotify reports {last_total} tracks" if last_total else "Spotify did not report track count"
+    raise RuntimeError(
+        f"API returned no tracks ({msg_total}). "
+        f"Probowano markets={markets[:4]}. "
+        f"Ostatnie odpowiedzi: {' | '.join(attempts[-3:])}"
+    )
+
+
+def _spotify_via_embed(req, pid: str) -> tuple[str, list[dict]]:
+    """Fallback: parsuje HTML strony embed (starszy format z __NEXT_DATA__)."""
+    headers = {
+        "User-Agent": _SPOTIFY_UA,
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    embed_url = f"https://open.spotify.com/embed/playlist/{pid}"
+    resp = req.get(embed_url, headers=headers, timeout=20)
+    resp.raise_for_status()
+    html = resp.text
+
+    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+    if not m:
+        raise RuntimeError("strona embed Spotify nie zawiera __NEXT_DATA__")
+
+    try:
+        data = json.loads(m.group(1))
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"nieprawidlowy JSON Spotify embed: {e}")
+
+    name = "Spotify Playlist"
+    tracks: list[dict] = []
+
+    def harvest(track_list):
+        for t in track_list:
+            if not isinstance(t, dict):
+                continue
+            title = (t.get("title") or t.get("name") or "").strip()
+            subtitle = t.get("subtitle")
+            if not subtitle and isinstance(t.get("artists"), list):
+                subtitle = ", ".join(a.get("name", "") for a in t["artists"] if isinstance(a, dict))
+            subtitle = (subtitle or "").strip()
+            if title:
+                tracks.append({"title": title, "artist": subtitle})
+
+    try:
+        entity = data["props"]["pageProps"]["state"]["data"]["entity"]
+        name = entity.get("name") or entity.get("title") or name
+        if isinstance(entity.get("trackList"), list):
+            harvest(entity["trackList"])
+    except (KeyError, TypeError):
+        pass
+
+    if not tracks:
+        def walk(node):
+            if isinstance(node, dict):
+                tl = node.get("trackList")
+                if isinstance(tl, list):
+                    harvest(tl)
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v)
+        walk(data)
+
+    if not tracks:
+        raise RuntimeError("embed nie zwrocil listy utworow (Spotify ladowal dynamicznie?)")
+
+    return name, tracks
+
+
+def _parse_spotify_playlist(url: str) -> tuple[str, list[dict]]:
+    """Zwraca (nazwa_playlisty, [{'artist': str, 'title': str}]).
+
+    Probuje po kolei:
+      1) Spotify Web API z anonimowym tokenem z glownej strony playlisty,
+      2) strona embed (fallback, dla starszych ukladow).
+    """
+    pid = _spotify_playlist_id(url)
+    if not pid:
+        raise ValueError("invalid Spotify playlist URL (expected 'open.spotify.com/playlist/<id>')")
+
