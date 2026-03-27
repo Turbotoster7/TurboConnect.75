@@ -1059,3 +1059,116 @@ def _job_write(job: dict) -> None:
 
 def _job_read(job_id: str) -> dict | None:
     try:
+        p = _job_path(job_id)
+    except ValueError:
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    except Exception:
+        return None
+
+
+def _job_cleanup_old() -> None:
+    cutoff = time.time() - _SPOTIFY_JOBS_TTL
+    try:
+        for entry in JOBS_DIR.iterdir():
+            if not entry.is_file() or entry.suffix != ".json":
+                continue
+            try:
+                if entry.stat().st_mtime < cutoff:
+                    entry.unlink(missing_ok=True)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
+def _job_new() -> dict:
+    _job_cleanup_old()
+    job = {
+        "id": uuid.uuid4().hex[:12],
+        "state": "running",
+        "logs": [],
+        "zip_url": None,
+        "zip_name": None,
+        "created": time.time(),
+        "updated": time.time(),
+    }
+    _job_write(job)
+    return job
+
+
+def _job_log(job: dict, text: str, kind: str = "info") -> None:
+    job["logs"].append({"t": text, "k": kind})
+    job["updated"] = time.time()
+    try:
+        _job_write(job)
+    except Exception:
+        pass
+
+
+def _spotify_run_job(job_id: str, url: str, limit: int, save_to_library: bool) -> None:
+    job = _job_read(job_id)
+    if not job:
+        return
+
+    try:
+        _job_log(job, "Fetching Spotify playlist data...", "info")
+        playlist_name, tracks = _parse_spotify_playlist(url)
+    except Exception as e:
+        _job_log(job, f"BLAD: {e}", "err")
+        job["state"] = "error"
+        _job_write(job)
+        return
+
+    tracks = tracks[:limit]
+    _job_log(job, f"Playlist: {playlist_name} ({len(tracks)} tracks)", "ok")
+
+    target_dir = MUSIC_DIR if save_to_library else (ZIPS_DIR / f"_tmp_{job_id}")
+    if not save_to_library:
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    downloaded: list[Path] = []
+    failed: list[str] = []
+    for idx, t in enumerate(tracks, 1):
+        query = f"{t['artist']} {t['title']}".strip() or t["title"]
+        _job_log(job, f"[{idx}/{len(tracks)}] {query}", "info")
+        try:
+            path = _download_track(query, target_dir)
+        except Exception as e:
+            _job_log(job, f"      BLAD: {e}", "err")
+            failed.append(query)
+            continue
+        downloaded.append(path)
+        _job_log(job, f"      OK -> {path.name}", "ok")
+
+    if not downloaded:
+        _job_log(job, "Nothing downloaded — aborting.", "err")
+        if not save_to_library and target_dir.exists():
+            shutil.rmtree(target_dir, ignore_errors=True)
+        job["state"] = "error"
+        _job_write(job)
+        return
+
+    zip_name = f"{_sanitize_zip_name(playlist_name)}_{int(time.time())}.zip"
+    zip_path = ZIPS_DIR / zip_name
+    _job_log(job, f"Packing {len(downloaded)} tracks into {zip_name}...", "info")
+    try:
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as zf:
+            for p in downloaded:
+                zf.write(p, arcname=p.name)
+    except Exception as e:
+        _job_log(job, f"BLAD ZIP: {e}", "err")
+        job["state"] = "error"
+        _job_write(job)
+        return
+
+    if not save_to_library:
+        shutil.rmtree(target_dir, ignore_errors=True)
+
+    _job_log(job, f"Gotowe. OK={len(downloaded)}, BLAD={len(failed)}", "ok")
+    job["zip_name"] = zip_name
+    job["zip_url"] = f"/api/spotify_zip/{zip_name}"
