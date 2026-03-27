@@ -1172,3 +1172,110 @@ def _spotify_run_job(job_id: str, url: str, limit: int, save_to_library: bool) -
     _job_log(job, f"Gotowe. OK={len(downloaded)}, BLAD={len(failed)}", "ok")
     job["zip_name"] = zip_name
     job["zip_url"] = f"/api/spotify_zip/{zip_name}"
+    job["state"] = "done"
+    _job_write(job)
+
+
+@app.route("/api/spotify_start", methods=["POST"])
+@login_required
+def api_spotify_start():
+    """Uruchamia import w watku w tle, zwraca job_id."""
+    src = request.get_json(silent=True) or request.form
+    url = (src.get("url") or "").strip()
+    try:
+        limit = int(src.get("limit") or 60)
+    except (TypeError, ValueError):
+        limit = 60
+    limit = max(1, min(limit, 200))
+    save_to_library = str(src.get("save", "1")).lower() not in ("0", "false", "no")
+
+    if not url:
+        return jsonify({"ok": False, "error": "missing url"}), 400
+
+    job = _job_new()
+    _job_log(job, f"Job created (pid_request={os.getpid()}).", "info")
+    t = threading.Thread(
+        target=_spotify_run_job,
+        args=(job["id"], url, limit, save_to_library),
+        name=f"spotify-import-{job['id']}",
+        daemon=True,
+    )
+    t.start()
+    return jsonify({"ok": True, "job_id": job["id"]})
+
+
+@app.route("/api/spotify_status/<job_id>")
+@login_required
+def api_spotify_status(job_id: str):
+    """Zwraca stan joba + nowe logi od pozycji 'since' (poll co ~1s z UI)."""
+    try:
+        since = int(request.args.get("since", "0"))
+    except ValueError:
+        since = 0
+    job = _job_read(job_id)
+    if not job:
+        return jsonify({"ok": False, "error": "nieznany job"}), 404
+    logs = job.get("logs") or []
+    logs_total = len(logs)
+    new_logs = logs[since:]
+    return jsonify({
+        "ok": True,
+        "state": job.get("state", "running"),
+        "logs": new_logs,
+        "logs_total": logs_total,
+        "zip_url": job.get("zip_url"),
+        "zip_name": job.get("zip_name"),
+    })
+
+
+# Stary streamingowy endpoint - zostawiamy dla kompatybilnosci, ale nie uzywamy
+@app.route("/api/spotify_stream")
+@login_required
+def api_spotify_stream():
+    """Streamuje progres importu Spotify -> YouTube -> pliki + ZIP.
+
+    Format odpowiedzi: text/plain, jedna linia = jeden komunikat.
+    Ostatnia linia po sukcesie: DONE: <url do ZIPa>
+    """
+    url = (request.args.get("url") or "").strip()
+    max_tracks = int(request.args.get("limit", "60"))
+    max_tracks = max(1, min(max_tracks, 200))
+    save_to_library = request.args.get("save", "1") not in ("0", "false", "no")
+
+    def stream():
+        def line(s: str) -> str:
+            return s.replace("\n", " ").replace("\r", " ") + "\n"
+
+        yield line(f"[*] Pobieram strone embed Spotify...")
+        try:
+            playlist_name, tracks = _parse_spotify_playlist(url)
+        except Exception as e:
+            yield line(f"[!] BLAD: {e}")
+            yield line("ERROR")
+            return
+
+        tracks = tracks[:max_tracks]
+        yield line(f"[+] Playlist: {playlist_name} ({len(tracks)} tracks)")
+
+        target_dir = MUSIC_DIR if save_to_library else (ZIPS_DIR / f"_tmp_{int(time.time())}")
+        if not save_to_library:
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+        downloaded: list[Path] = []
+        failed: list[str] = []
+        for idx, t in enumerate(tracks, 1):
+            query = f"{t['artist']} {t['title']}".strip() or t["title"]
+            yield line(f"[{idx:>2}/{len(tracks)}] {query}")
+            try:
+                path = _download_track(query, target_dir)
+            except Exception as e:
+                yield line(f"      BLAD: {e}")
+                failed.append(query)
+                continue
+            downloaded.append(path)
+            yield line(f"      OK -> {path.name}")
+
+        if not downloaded:
+            yield line("[!] Nothing downloaded — aborting.")
+            yield line("ERROR")
+            if not save_to_library and target_dir.exists():
