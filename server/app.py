@@ -747,3 +747,201 @@ def _parse_spotify_playlist(url: str) -> tuple[str, list[dict]]:
     if not pid:
         raise ValueError("invalid Spotify playlist URL (expected 'open.spotify.com/playlist/<id>')")
 
+    req = _require_requests()
+    errors: list[str] = []
+    has_cc = bool(_spotify_client_credentials())
+
+    for label, fn in (("api", _spotify_via_api), ("embed", _spotify_via_embed)):
+        try:
+            name, tracks = fn(req, pid)
+            return name, _dedup_tracks(tracks)
+        except Exception as e:  # noqa: BLE001 - chcemy zlapac WSZYSTKO
+            errors.append(f"{label}: {e}")
+
+    extra = ""
+    if not has_cc:
+        extra = (
+            " | Wskazowka: zaloz darmowa aplikacje na "
+            "https://developer.spotify.com/dashboard i ustaw zmienne "
+            "SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET w panelu hostingu (Environment Variables)."
+        )
+    raise ValueError(
+        "Could not fetch playlist from Spotify. Tried: " + "; ".join(errors) + extra
+    )
+
+
+def _dedup_tracks(tracks: list[dict]) -> list[dict]:
+    seen: set[tuple[str, str]] = set()
+    unique: list[dict] = []
+    for t in tracks:
+        key = (t["title"].lower(), t.get("artist", "").lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(t)
+    return unique
+
+
+def _sanitize_zip_name(name: str) -> str:
+    name = re.sub(r"[^A-Za-z0-9 _\-]+", " ", name).strip()
+    name = re.sub(r"\s+", "_", name)
+    return name[:60] or "spotify_playlist"
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        if _verify_login(username, password):
+            session.permanent = True
+            session["tc_user"] = username
+            nxt = request.form.get("next") or request.args.get("next")
+            if nxt and nxt.startswith("/") and not nxt.startswith("//"):
+                return redirect(nxt)
+            return redirect(url_for("music_page"))
+        flash("Invalid username or password.")
+    if _is_logged_in():
+        return redirect(url_for("music_page"))
+    return render_template(
+        "login.html",
+        next=request.args.get("next", ""),
+        errors=get_flashed_messages(),
+    )
+
+
+@app.route("/logout")
+def logout():
+    session.pop("tc_user", None)
+    return redirect(url_for("login"))
+
+
+@app.route("/")
+@login_required
+def index():
+    return redirect(url_for("music_page"))
+
+@app.route("/music")
+@login_required
+def music_page():
+    q = request.args.get("q", "")
+    qn = _clean_string(q)
+    tracks = []
+    ffmpeg_bin = _get_ffmpeg_path()
+    status = "AKTYWNY" if ffmpeg_bin else "BRAK"
+    playlists_data = _load_playlists()
+
+    for t in _all_tracks():
+        if not qn or qn in _clean_string(t["title"]):
+            tracks.append(t)
+
+    playlists = []
+    for p in playlists_data.get("playlists", []):
+        playlists.append(
+            {"id": p.get("id"), "name": p.get("name", "Playlist"), "track_count": len(p.get("track_ids", []))}
+        )
+    return render_template("music.html", q_e=q, tracks=tracks, playlists=playlists, ffmpeg_status=status)
+
+
+@app.route("/player/<track_id>")
+@login_required
+def player(track_id: str):
+    tid = _normalize_stream_track_id(track_id)
+    tracks = _all_tracks()
+    idx = -1
+    for i, t in enumerate(tracks):
+        if t["id"] == tid:
+            idx = i
+            break
+    if idx < 0:
+        abort(404)
+    current = tracks[idx]
+    prev_url = f"/player/{tracks[idx - 1]['id']}" if idx > 0 else None
+    next_url = f"/player/{tracks[idx + 1]['id']}" if idx + 1 < len(tracks) else None
+    prefetch_1 = tracks[idx + 1]["stream_url"] if idx + 1 < len(tracks) else None
+    prefetch_2 = tracks[idx + 2]["stream_url"] if idx + 2 < len(tracks) else None
+    return render_template(
+        "player.html",
+        title=current["title"],
+        stream_url=current["stream_url"],
+        download_url=current["download_url"],
+        prev_url=prev_url,
+        next_url=next_url,
+        prefetch_1=prefetch_1,
+        prefetch_2=prefetch_2,
+    )
+
+
+@app.route("/playlists/create", methods=["POST"])
+@login_required
+def playlists_create():
+    name = request.form.get("name", "").strip()
+    if not name:
+        return "Enter a playlist name.", 400
+    data = _load_playlists()
+    playlist_id = hashlib.sha1(f"{name}-{time.time()}".encode("utf-8")).hexdigest()[:12]
+    data.setdefault("playlists", []).append(
+        {"id": playlist_id, "name": name[:60], "track_ids": [], "created": int(time.time())}
+    )
+    _save_playlists(data)
+    return redirect(url_for("music_page"))
+
+
+@app.route("/playlists/delete/<playlist_id>")
+@login_required
+def playlists_delete(playlist_id: str):
+    data = _load_playlists()
+    before = len(data.get("playlists", []))
+    data["playlists"] = [p for p in data.get("playlists", []) if p.get("id") != playlist_id]
+    if len(data["playlists"]) != before:
+        _save_playlists(data)
+    return redirect(url_for("music_page"))
+
+
+@app.route("/playlists/add_tracks", methods=["POST"])
+@login_required
+def playlists_add_tracks():
+    playlist_id = request.form.get("playlist_id", "").strip()
+    track_ids = request.form.getlist("track_ids")
+    if not playlist_id:
+        return "Select a playlist.", 400
+    if not track_ids:
+        return "Select at least one track.", 400
+
+    available_ids = {t["id"] for t in _all_tracks()}
+    data = _load_playlists()
+    playlist = _find_playlist(data, playlist_id)
+    if not playlist:
+        return "Playlist does not exist.", 404
+    existing = set(playlist.get("track_ids", []))
+    for tid in track_ids:
+        if tid in available_ids and tid not in existing:
+            playlist.setdefault("track_ids", []).append(tid)
+    _save_playlists(data)
+    return redirect(url_for("playlist_view", playlist_id=playlist_id))
+
+
+@app.route("/playlist/<playlist_id>")
+@login_required
+def playlist_view(playlist_id: str):
+    data = _load_playlists()
+    playlist = _find_playlist(data, playlist_id)
+    if not playlist:
+        return "No playlist found.", 404
+    all_tracks = {t["id"]: t for t in _all_tracks()}
+    tracks = [all_tracks[tid] for tid in playlist.get("track_ids", []) if tid in all_tracks]
+    return render_template("playlist.html", name=playlist.get("name", "Playlist"), tracks=tracks)
+
+
+@app.route("/api/download_selected", methods=["POST"])
+@login_required
+def api_download_selected():
+    track_ids = request.form.getlist("track_ids")
+    if not track_ids:
+        return "No tracks selected.", 400
+    all_tracks = {t["id"]: t for t in _all_tracks()}
+    selected = [all_tracks[tid] for tid in track_ids if tid in all_tracks]
+    if not selected:
+        return "No valid tracks found.", 400
+
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_STORED) as zf:
