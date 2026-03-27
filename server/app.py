@@ -945,3 +945,117 @@ def api_download_selected():
 
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_STORED) as zf:
+        for t in selected:
+            zf.write(t["path"], arcname=t["filename"])
+    mem.seek(0)
+    ts = int(time.time())
+    return send_file(
+        mem,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"turboconnect-selected-{ts}.zip",
+    )
+
+@app.route("/api/fetch")
+def api_fetch():
+    query = request.args.get("q", "").strip()
+    if not query:
+        return "Name is required!", 400
+    try:
+        path = _download_track(query, MUSIC_DIR)
+    except Exception as e:
+        return f"BLAD: {e}", 500
+    if request.args.get("format") == "json":
+        return {"ok": True, "filename": path.name, "title": path.stem.replace("_", " ")}
+    return f"Pobrano: {path.name}"
+
+
+@app.route("/api/search_plain")
+def api_search_plain():
+    q = request.args.get("q", "")
+    qn = _clean_string(q)
+
+    # Optional client-side cap; default high enough that newly fetched tracks
+    # actually show up. Clamp to a sane upper bound for the tiny S60 list.
+    try:
+        limit = int(request.args.get("limit", "60"))
+    except ValueError:
+        limit = 60
+    limit = max(1, min(limit, 200))
+
+    # Gather matches, then sort newest first so freshly downloaded tracks
+    # appear at the top of the Nokia screen.
+    matches: list[tuple[float, dict]] = []
+    for t in _all_tracks():
+        if qn and qn not in _clean_string(t["title"]):
+            continue
+        try:
+            mtime = float(t["path"].stat().st_mtime)
+        except OSError:
+            mtime = 0.0
+        matches.append((mtime, t))
+    matches.sort(key=lambda item: item[0], reverse=True)
+
+    lines: list[str] = []
+    for _mtime, t in matches[:limit]:
+        title = t["title"].replace("|", " ").replace("\r", " ").replace("\n", " ")
+        filename = _ascii_download_name(t["path"]).replace("|", "_")
+        lines.append(f"{title}|{filename}|{t['download_url']}")
+
+    response = Response("\n".join(lines), mimetype="text/plain; charset=utf-8")
+    # Prevent intermediate proxies/host from caching the listing while we are
+    # actively adding tracks via /api/fetch.
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
+@app.route("/api/spotify_preview")
+@login_required
+def api_spotify_preview():
+    """Zwraca liste utworow z playlisty Spotify (bez pobierania)."""
+    url = request.args.get("url", "").strip()
+    try:
+        name, tracks = _parse_spotify_playlist(url)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 400
+    return {
+        "ok": True,
+        "name": name,
+        "count": len(tracks),
+        "tracks": tracks,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Background job system dla importu Spotify
+# (shared hosting czesto zabija dlugie polaczenia HTTP - dlatego puszczamy
+# robote w tle, a UI tylko odpytuje status co sekunde)
+# ---------------------------------------------------------------------------
+
+# Stan zadania trzymamy w pliku JSON, zeby kazdy worker Passengera widzial to samo.
+# (Slownik w pamieci by nie wystarczyl - polling moze trafic do innego procesu
+#  niz ten ktory uruchomil watek.)
+_JOB_FILE_LOCK = threading.Lock()
+_SPOTIFY_JOBS_TTL = 3600  # 1h
+
+
+def _job_path(job_id: str) -> Path:
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "", job_id)[:64]
+    if not safe:
+        raise ValueError("bad job id")
+    return JOBS_DIR / f"{safe}.json"
+
+
+def _job_write(job: dict) -> None:
+    p = _job_path(job["id"])
+    tmp = p.with_suffix(".tmp")
+    with _JOB_FILE_LOCK:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(job, f, ensure_ascii=False)
+        os.replace(tmp, p)
+
+
+def _job_read(job_id: str) -> dict | None:
+    try:
