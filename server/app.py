@@ -1279,3 +1279,90 @@ def api_spotify_stream():
             yield line("[!] Nothing downloaded — aborting.")
             yield line("ERROR")
             if not save_to_library and target_dir.exists():
+                shutil.rmtree(target_dir, ignore_errors=True)
+            return
+
+        zip_name = f"{_sanitize_zip_name(playlist_name)}_{int(time.time())}.zip"
+        zip_path = ZIPS_DIR / zip_name
+        yield line(f"[*] Packing {len(downloaded)} tracks into {zip_name}...")
+        try:
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as zf:
+                for p in downloaded:
+                    zf.write(p, arcname=p.name)
+        except Exception as e:
+            yield line(f"[!] BLAD ZIP: {e}")
+            yield line("ERROR")
+            return
+
+        if not save_to_library:
+            shutil.rmtree(target_dir, ignore_errors=True)
+
+        zip_url = f"/api/spotify_zip/{zip_name}"
+        yield line(f"[+] Gotowe. OK={len(downloaded)}, BLAD={len(failed)}")
+        yield line(f"DONE: {zip_url}")
+
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "X-Accel-Buffering": "no",
+    }
+    return Response(stream_with_context(stream()), mimetype="text/plain; charset=utf-8", headers=headers)
+
+
+@app.route("/api/spotify_last_zip")
+@login_required
+def api_spotify_last_zip():
+    """Zwraca najnowszy ZIP w katalogu zips/ (fallback gdy strumien sie urwie)."""
+    try:
+        zips = [p for p in ZIPS_DIR.glob("*.zip") if p.is_file()]
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    if not zips:
+        return jsonify({"ok": False, "error": "no zip archives"}), 404
+    newest = max(zips, key=lambda p: p.stat().st_mtime)
+    return jsonify({
+        "ok": True,
+        "name": newest.name,
+        "url": f"/api/spotify_zip/{newest.name}",
+        "size": newest.stat().st_size,
+        "mtime": int(newest.stat().st_mtime),
+    })
+
+
+@app.route("/api/spotify_zip/<name>")
+@login_required
+def api_spotify_zip(name: str):
+    safe = Path(name).name
+    if not safe.endswith(".zip"):
+        abort(404)
+    path = ZIPS_DIR / safe
+    if not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="application/zip", as_attachment=True, download_name=safe)
+
+@app.route("/library/stream/<track_id>")
+def library_stream(track_id: str):
+    tid = _normalize_stream_track_id(track_id)
+    path = _path_for_track_id(tid)
+    if not path:
+        abort(404)
+    response = send_file(path, mimetype=_sniff_audio_mimetype(path), conditional=False)
+    response.headers.set("Cache-Control", "public, max-age=86400")
+    return response
+
+@app.route("/library/file/<track_id>")
+def library_file_download(track_id: str):
+    tid = _normalize_stream_track_id(track_id)
+    path = _path_for_track_id(tid)
+    if not path:
+        abort(404)
+    return send_file(path, mimetype=_sniff_audio_mimetype(path), as_attachment=True, download_name=_ascii_download_name(path))
+
+@app.route("/api/convert_m4a")
+@login_required
+def api_convert_m4a():
+    converted, failed, details = _convert_m4a_library_to_mp3(delete_source=True)
+    return f"Konwersja: {converted} OK, {failed} bledow. Szczegoly: {details}"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

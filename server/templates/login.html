@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logowanie · Turboconnect</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="icon" href="{{ url_for('static', filename='img/icon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/turboconnect.css') }}">
+</head>
+<body class="theme-aviation tc-app tc-login-page">
+
+  <div class="cockpit-bg">
+    <div class="grid-overlay"></div>
+  </div>
+
+  <header class="tech-header">
+    <div class="tech-nav-container">
+      <a href="{{ url_for('login') }}" class="tech-brand">
+        <div class="brand-icon-box">
+          <i class="fas fa-lock"></i>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">TURBOCONNECT<span class="highlight">.E75</span></span>
+          <span class="brand-subtitle">SECURE LOGIN</span>
+        </div>
+      </a>
+      <div class="nav-widgets">
+        <div class="system-status">
+          <span class="status-indicator online"></span>
+          <span class="status-text">AUTH GATE</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="tc-main tc-login-main">
+    <div class="tc-login-wrap">
+      <section class="hud-panel tc-login-card">
+        <div class="panel-header">
+          <span class="header-title">AUTORYZACJA</span>
+          <span class="header-code">SESSION</span>
+        </div>
+        <div class="panel-content">
+          <p class="tc-hero-text">
+            Panel Turboconnect jest <strong>zamknięty na klucz</strong>. Zaloguj się, aby zarządzać biblioteką, playlistami i importować Spotify.
+          </p>
+
+          {% if errors %}
+            <div class="tc-flash">
+              {% for msg in errors %}
+                <div class="tc-flash-line"><i class="fas fa-triangle-exclamation"></i> {{ msg }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <form method="post" action="{{ url_for('login') }}" class="tc-stack tc-login-form" autocomplete="off">
+            <input type="hidden" name="next" value="{{ next }}">
+
+            <label class="tc-label" for="login-username">UŻYTKOWNIK</label>
+            <input id="login-username" type="text" name="username" placeholder="admin" autocomplete="username" autofocus required>
+
+            <label class="tc-label" for="login-password">HASŁO</label>
+            <input id="login-password" type="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+
+            <button type="submit" class="btn-transmit">
+              <span class="btn-content"><i class="fas fa-right-to-bracket"></i> ZALOGUJ</span>
+            </button>
+          </form>
+
+          <p class="tc-hint" style="margin-top: 1rem;">
+            Pierwsze uruchomienie tworzy konto <code>admin / admin</code> (lub z <code>TURBOCONNECT_USER</code> / <code>TURBOCONNECT_PASS</code>).
+            Zmień je w pliku <code>users.json</code> obok <code>app.py</code>.
+          </p>
+        </div>
+      </section>
+
+      <p class="tc-footer-note">Turboconnect · interfejs www w stylu turbotoster.dev</p>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/turboconnect.js') }}"></script>
+</body>
+</html>
