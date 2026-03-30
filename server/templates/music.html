@@ -96,3 +96,111 @@
             {% if tracks %}
               <div class="tc-library-toolbar">
                 <label class="tc-label" for="add-target">DODAJ ZAZNACZONE DO PLAYLISTY</label>
+                <div class="tc-input-row">
+                  <select id="add-target" name="playlist_id">
+                    <option value="">-- wybierz playlistę --</option>
+                    {% for p in playlists %}
+                      <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn-transmit tc-btn-inline">
+                    <span class="btn-content"><i class="fas fa-folder-plus"></i> DODAJ</span>
+                  </button>
+                  <button type="submit" class="btn-transmit tc-btn-inline tc-btn-ghost"
+                          formaction="{{ url_for('api_download_selected') }}" formmethod="post">
+                    <span class="btn-content"><i class="fas fa-file-archive"></i> ZIP</span>
+                  </button>
+                </div>
+                <div class="tc-bulk-actions">
+                  <button type="button" id="bulkAll" class="tc-bulk-btn">zaznacz wszystko</button>
+                  <button type="button" id="bulkNone" class="tc-bulk-btn">odznacz wszystko</button>
+                </div>
+              </div>
+
+              <ul class="track-list" id="trackList">
+                {% for t in tracks %}
+                  <li class="track-row"
+                      data-track-id="{{ t.id }}"
+                      data-stream-url="{{ t.stream_url }}"
+                      data-title="{{ t.title }}"
+                      data-filename="{{ t.filename }}"
+                      data-search="{{ t.title|lower }} {{ t.filename|lower }}">
+                    <div class="track-row-main">
+                      <button type="button" class="track-play-btn" title="Zagraj">
+                        <i class="fas fa-play"></i>
+                      </button>
+                      <label class="track-label">
+                        <input type="checkbox" name="track_ids" value="{{ t.id }}">
+                        <span class="track-title">{{ t.title }}</span>
+                      </label>
+                    </div>
+                    <div class="tiny track-filename">{{ t.filename }}</div>
+                    <div class="track-actions">
+                      <a href="{{ t.download_url }}"><i class="fas fa-download"></i> pobierz</a>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+              <p class="tc-hint" id="emptyFilter" hidden>Brak wyników dla aktualnego filtra.</p>
+            {% else %}
+              <p class="tc-hint">
+                Biblioteka pusta{% if q_e %} dla zapytania „{{ q_e }}”{% endif %}.
+                Dodaj nowe utwory w sekcji <a href="#" data-tools-open>NARZĘDZIA</a> poniżej.
+              </p>
+            {% endif %}
+          </div>
+        </section>
+      </form>
+
+      <div class="tc-tools">
+        <button type="button" id="toolsToggle" class="tc-tools-toggle" aria-expanded="false" aria-controls="toolsArea">
+          <span class="tc-tools-icon"><i class="fas fa-toolbox"></i></span>
+          <span class="tc-tools-label">NARZĘDZIA</span>
+          <span class="tc-tools-sub">pobierz z YouTube · import Spotify · konsola · playlisty</span>
+          <span class="tc-tools-chevron"><i class="fas fa-chevron-down"></i></span>
+        </button>
+
+        <div id="toolsArea" class="tc-tools-area" aria-hidden="true">
+          <div class="tc-tools-inner">
+
+            <section class="tc-grid-2">
+              <div class="hud-panel" id="tc-fetch">
+                <div class="panel-header">
+                  <span class="header-title">POBIERZ UTWÓR</span>
+                  <span class="header-code">YouTube</span>
+                </div>
+                <div class="panel-content">
+                  <form id="fetchForm" class="tc-stack">
+                    <label class="tc-label" for="fetch-q">ARTYSTA / TYTUŁ</label>
+                    <input id="fetch-q" type="text" name="q" placeholder="Artysta - Tytuł" autocomplete="off" required>
+                    <button type="submit" class="btn-transmit">
+                      <span class="btn-content"><i class="fas fa-cloud-download-alt"></i> POBIERZ DO BIBLIOTEKI</span>
+                    </button>
+                    <p class="tc-hint">Bez FFmpeg pobierane są tylko natywne MP3 (gdy dostępne).</p>
+                  </form>
+                </div>
+              </div>
+
+              <div class="hud-panel" id="tc-spotify">
+                <div class="panel-header">
+                  <span class="header-title">IMPORT SPOTIFY → ZIP</span>
+                  <span class="header-code"><i class="fab fa-spotify"></i> PUBLIC</span>
+                </div>
+                <div class="panel-content">
+                  <form id="spotifyForm" class="tc-stack">
+                    <label class="tc-label" for="spotify-url">URL PUBLICZNEJ PLAYLISTY</label>
+                    <input id="spotify-url" type="text" name="url" placeholder="https://open.spotify.com/playlist/..." autocomplete="off" required>
+                    <label class="tc-label" for="spotify-limit">LIMIT UTWORÓW</label>
+                    <input id="spotify-limit" type="number" name="limit" value="40" min="1" max="200">
+                    <label class="tc-checkbox">
+                      <input type="checkbox" id="spotify-save" name="save" checked>
+                      <span>Zapisz pobrane też do biblioteki</span>
+                    </label>
+                    <button type="submit" class="btn-transmit">
+                      <span class="btn-content"><i class="fas fa-file-archive"></i> POBIERZ JAKO .ZIP</span>
+                    </button>
+                    <p class="tc-hint">
+                      Tytuły pobierane są oficjalnym Spotify Web API, audio z YouTube.
+                      Wymaga ustawienia <code>SPOTIFY_CLIENT_ID</code> i <code>SPOTIFY_CLIENT_SECRET</code>
+                      (darmowa aplikacja na
+                      <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>).
