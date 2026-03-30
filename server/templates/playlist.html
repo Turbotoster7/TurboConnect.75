@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ name }} — Turboconnect</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="icon" href="{{ url_for('static', filename='img/icon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/turboconnect.css') }}">
+</head>
+<body class="theme-aviation tc-app player-page">
+
+  <div class="loader-screen" id="loader">
+    <div class="hud-circle"></div>
+    <div class="loader-content">
+      <div class="loader-text">
+        <div class="log-line">&gt; PLAYLIST LOAD... <span class="ok">OK</span></div>
+      </div>
+      <div class="loader-bar-bg">
+        <div class="loader-bar-fill"></div>
+      </div>
+      <div class="loader-percent">0%</div>
+    </div>
+  </div>
+
+  <div class="cockpit-bg">
+    <div class="grid-overlay"></div>
+  </div>
+
+  <div class="main-plane" id="flight-container">
+    <img src="{{ url_for('static', filename='img/fighter.svg') }}" class="fighter-img" alt="">
+  </div>
+
+  <header class="tech-header">
+    <div class="tech-nav-container">
+      <a href="{{ url_for('music_page') }}" class="tech-brand">
+        <div class="brand-icon-box">
+          <i class="fas fa-list-ol"></i>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">PLAYLIST</span>
+          <span class="brand-subtitle">TURBOCONNECT</span>
+        </div>
+      </a>
+      <nav class="tech-menu" id="navMenu">
+        <a href="{{ url_for('music_page') }}" class="nav-link active">
+          <span class="link-bracket">[</span> POWRÓT <span class="link-bracket">]</span>
+        </a>
+      </nav>
+      <div class="nav-widgets">
+        {% if current_user %}
+          <div class="tc-user-pill" title="Zalogowany jako {{ current_user }}">
+            <i class="fas fa-user-astronaut"></i>
+            <span class="tc-user-name">{{ current_user }}</span>
+            <a href="{{ url_for('logout') }}" class="tc-logout-link" title="Wyloguj">
+              <i class="fas fa-right-from-bracket"></i>
+            </a>
+          </div>
+        {% endif %}
+        <button type="button" class="mobile-toggle" id="menuToggle" aria-label="Menu">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" style="min-height: auto; padding-top: 100px; padding-bottom: 2rem;">
+      <div class="container">
+        <div class="hud-panel">
+          <div class="panel-header">
+            <span class="header-title">{{ name }}</span>
+            <span class="header-code">{{ tracks|length }} UTWOR(ÓW)</span>
+          </div>
+          <div class="panel-content">
+            {% for t in tracks %}
+              <div class="track-row">
+                <div style="font-family: var(--font-mono); color: var(--text);">{{ t.title }}</div>
+                <div class="track-actions" style="margin-left: 0;">
+                  <a href="{{ url_for('player', track_id=t.id) }}"><i class="fas fa-play"></i> GRAJ</a>
+                  <a href="{{ t.download_url }}"><i class="fas fa-download"></i> POBIERZ</a>
+                </div>
+              </div>
+            {% endfor %}
+            {% if not tracks %}
+              <p class="tiny">Brak utworów w playliście.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/turboconnect.js') }}"></script>
+</body>
+</html>

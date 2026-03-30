@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turboconnect — biblioteka</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="icon" href="{{ url_for('static', filename='img/icon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/turboconnect.css') }}">
+</head>
+<body class="theme-aviation tc-app tc-library-page">
+
+  <div class="cockpit-bg">
+    <div class="grid-overlay"></div>
+  </div>
+
+  <header class="tech-header">
+    <div class="tech-nav-container">
+      <a href="{{ url_for('music_page') }}" class="tech-brand">
+        <div class="brand-icon-box">
+          <i class="fas fa-headphones-alt"></i>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">TURBOCONNECT<span class="highlight">.E75</span></span>
+          <span class="brand-subtitle">MUSIC NODE</span>
+        </div>
+      </a>
+
+      <nav class="tech-menu" id="navMenu">
+        <a href="#tc-search" class="nav-link active">
+          <span class="link-bracket">[</span> SZUKAJ <span class="link-bracket">]</span>
+        </a>
+        <a href="#tc-library" class="nav-link">
+          <span class="link-bracket">[</span> BIBLIOTEKA <span class="link-bracket">]</span>
+        </a>
+        <a href="#tc-fetch" class="nav-link" data-tools-open>
+          <span class="link-bracket">[</span> POBIERZ <span class="link-bracket">]</span>
+        </a>
+        <a href="#tc-spotify" class="nav-link" data-tools-open>
+          <span class="link-bracket">[</span> SPOTIFY <span class="link-bracket">]</span>
+        </a>
+      </nav>
+
+      <div class="nav-widgets">
+        <div class="system-status">
+          <span class="status-indicator online"></span>
+          <span class="status-text">FFmpeg: {{ ffmpeg_status }}</span>
+        </div>
+        {% if current_user %}
+          <div class="tc-user-pill" title="Zalogowany jako {{ current_user }}">
+            <i class="fas fa-user-astronaut"></i>
+            <span class="tc-user-name">{{ current_user }}</span>
+            <a href="{{ url_for('logout') }}" class="tc-logout-link" title="Wyloguj">
+              <i class="fas fa-right-from-bracket"></i>
+            </a>
+          </div>
+        {% endif %}
+        <button type="button" class="mobile-toggle" id="menuToggle" aria-label="Menu">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="tc-main">
+    <div class="tc-wrap">
+
+      <section class="tc-hero-card hud-panel" id="tc-search">
+        <div class="panel-header">
+          <span class="header-title">PANEL BIBLIOTEKI</span>
+          <span class="header-code">{{ tracks|length }} TRACK(S)</span>
+        </div>
+        <div class="panel-content">
+          <div class="tc-search-bar">
+            <label for="search-q" class="tc-label">SZUKAJ W BIBLIOTECE <span class="tc-kbd">/</span> aby skupić, <span class="tc-kbd">Esc</span> aby wyczyścić</label>
+            <div class="tc-input-row">
+              <input id="search-q" type="text" name="q" value="" placeholder="zacznij pisać aby filtrować…"
+                     autocomplete="off" spellcheck="false">
+              <button type="button" id="searchClear" class="btn-transmit tc-btn-inline tc-btn-ghost">
+                <span class="btn-content"><i class="fas fa-times"></i> WYCZYŚĆ</span>
+              </button>
+            </div>
+            <p class="tc-hint" id="searchCounter"></p>
+          </div>
+        </div>
+      </section>
+
+      <form id="libForm" method="post" action="{{ url_for('playlists_add_tracks') }}">
+        <section class="hud-panel" id="tc-library">
+          <div class="panel-header">
+            <span class="header-title">BIBLIOTEKA AUDIO</span>
+            <span class="header-code">{{ tracks|length }} TRACK(S){% if q_e %} · filtr: „{{ q_e }}”{% endif %}</span>
+          </div>
+          <div class="panel-content">
+            {% if tracks %}
+              <div class="tc-library-toolbar">
+                <label class="tc-label" for="add-target">DODAJ ZAZNACZONE DO PLAYLISTY</label>
