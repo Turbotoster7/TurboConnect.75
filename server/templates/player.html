@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }} — Turboconnect</title>
+  {% if prefetch_1 %}<link rel="prefetch" href="{{ prefetch_1 }}">{% endif %}
+  {% if prefetch_2 %}<link rel="prefetch" href="{{ prefetch_2 }}">{% endif %}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="icon" href="{{ url_for('static', filename='img/icon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/turboconnect.css') }}">
+</head>
+<body class="theme-aviation tc-app player-page">
+
+  <div class="loader-screen" id="loader">
+    <div class="hud-circle"></div>
+    <div class="loader-content">
+      <div class="loader-text">
+        <div class="log-line">&gt; BUFFER... <span class="ok">ARM</span></div>
+        <div class="log-line">&gt; STREAM... <span class="blink">READY</span></div>
+      </div>
+      <div class="loader-bar-bg">
+        <div class="loader-bar-fill"></div>
+      </div>
+      <div class="loader-percent">0%</div>
+    </div>
+  </div>
+
+  <div class="cockpit-bg">
+    <div class="grid-overlay"></div>
+  </div>
+
+  <div class="main-plane" id="flight-container">
+    <img src="{{ url_for('static', filename='img/fighter.svg') }}" class="fighter-img" alt="">
+  </div>
+
+  <header class="tech-header">
+    <div class="tech-nav-container">
+      <a href="{{ url_for('music_page') }}" class="tech-brand">
+        <div class="brand-icon-box">
+          <i class="fas fa-play"></i>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">NOW PLAYING</span>
+          <span class="brand-subtitle">TURBOCONNECT</span>
+        </div>
+      </a>
+      <nav class="tech-menu" id="navMenu">
+        <a href="{{ url_for('music_page') }}" class="nav-link active">
+          <span class="link-bracket">[</span> BIBLIOTEKA <span class="link-bracket">]</span>
+        </a>
+      </nav>
+      <div class="nav-widgets">
+        {% if current_user %}
+          <div class="tc-user-pill" title="Zalogowany jako {{ current_user }}">
+            <i class="fas fa-user-astronaut"></i>
+            <span class="tc-user-name">{{ current_user }}</span>
+            <a href="{{ url_for('logout') }}" class="tc-logout-link" title="Wyloguj">
+              <i class="fas fa-right-from-bracket"></i>
+            </a>
+          </div>
+        {% endif %}
+        <button type="button" class="mobile-toggle" id="menuToggle" aria-label="Menu">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" style="min-height: auto; padding-top: 100px; padding-bottom: 2rem;">
+      <div class="container">
+        <div class="hud-panel">
+          <div class="panel-header">
+            <span class="header-title">{{ title }}</span>
+            <span class="header-code">PRELOAD=METADATA</span>
+          </div>
+          <div class="panel-content">
+            <audio controls preload="metadata" src="{{ stream_url }}"></audio>
+            <p class="tiny" style="margin-top: 12px;">Tryb oszczędny: lekki HTML, prefetch sąsiednich strumieni.</p>
+          </div>
+        </div>
+
+        <div class="hud-panel" style="margin-top: 1rem;">
+          <div class="panel-content" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <a href="{{ url_for('music_page') }}" class="btn btn-outline" style="width: auto; clip-path: none;">
+              <i class="fas fa-list"></i> BIBLIOTEKA
+            </a>
+            {% if prev_url %}
+              <a href="{{ prev_url }}" class="btn btn-primary" style="width: auto;">
+                <i class="fas fa-step-backward"></i> POPRZEDNI
+              </a>
+            {% endif %}
+            {% if next_url %}
+              <a href="{{ next_url }}" class="btn btn-primary" style="width: auto;">
+                <i class="fas fa-step-forward"></i> NASTĘPNY
+              </a>
+            {% endif %}
+            <a href="{{ download_url }}" class="btn btn-outline" style="width: auto;">
+              <i class="fas fa-download"></i> POBIERZ
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/turboconnect.js') }}"></script>
+</body>
+</html>
