@@ -204,3 +204,101 @@
                       Wymaga ustawienia <code>SPOTIFY_CLIENT_ID</code> i <code>SPOTIFY_CLIENT_SECRET</code>
                       (darmowa aplikacja na
                       <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>).
+                    </p>
+                  </form>
+                </div>
+              </div>
+            </section>
+
+            <section class="hud-panel">
+              <div class="panel-header">
+                <span class="header-title">KONSOLA TRANSMISJI</span>
+                <span class="header-code blink" id="consoleStatus">IDLE</span>
+              </div>
+              <div class="panel-content">
+                <div id="consoleLog" class="tc-console">
+                  <div class="log-line">&gt; gotowy do pracy.</div>
+                </div>
+                <div class="tc-console-actions" id="consoleActions" hidden>
+                  <a id="consoleDownload" class="btn-transmit" href="#" download>
+                    <span class="btn-content"><i class="fas fa-download"></i> POBIERZ ZIP</span>
+                  </a>
+                  <button type="button" class="btn-transmit tc-btn-ghost" id="consoleClear">
+                    <span class="btn-content"><i class="fas fa-broom"></i> WYCZYŚĆ</span>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="tc-grid-2">
+              <div class="hud-panel">
+                <div class="panel-header">
+                  <span class="header-title">NOWA PLAYLISTA</span>
+                  <span class="header-code">LOCAL</span>
+                </div>
+                <div class="panel-content">
+                  <form method="post" action="{{ url_for('playlists_create') }}" class="tc-stack">
+                    <label class="tc-label" for="playlist-name">NAZWA</label>
+                    <input id="playlist-name" type="text" name="name" placeholder="np. Do biegania" required autocomplete="off">
+                    <button type="submit" class="btn-transmit">
+                      <span class="btn-content"><i class="fas fa-plus"></i> UTWÓRZ</span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div class="hud-panel">
+                <div class="panel-header">
+                  <span class="header-title">TWOJE PLAYLISTY</span>
+                  <span class="header-code">{{ playlists|length }}</span>
+                </div>
+                <div class="panel-content">
+                  {% if playlists %}
+                    <ul class="tc-playlist-list">
+                      {% for p in playlists %}
+                        <li>
+                          <span class="tc-playlist-name">{{ p.name }}</span>
+                          <span class="tc-playlist-count">({{ p.track_count }})</span>
+                          <a href="{{ url_for('playlist_view', playlist_id=p.id) }}"><i class="fas fa-folder-open"></i> otwórz</a>
+                          <a href="{{ url_for('playlists_delete', playlist_id=p.id) }}" class="tc-link-danger"
+                             onclick="return confirm('Usunąć playlistę?');"><i class="fas fa-trash"></i> usuń</a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  {% else %}
+                    <p class="tc-hint">Brak playlist.</p>
+                  {% endif %}
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+
+      <p class="tc-footer-note">Turboconnect · interfejs www w stylu turbotoster.dev</p>
+    </div>
+  </main>
+
+  <aside id="miniPlayer" class="tc-miniplayer" hidden>
+    <div class="tc-mp-inner">
+      <div class="tc-mp-info">
+        <span class="tc-mp-status"><i class="fas fa-music"></i></span>
+        <div class="tc-mp-text">
+          <div class="tc-mp-title" id="mpTitle">—</div>
+          <div class="tc-mp-meta" id="mpMeta">gotowy</div>
+        </div>
+      </div>
+      <div class="tc-mp-controls">
+        <button type="button" id="mpPrev" title="Poprzedni"><i class="fas fa-backward-step"></i></button>
+        <button type="button" id="mpPlay" title="Play/Pauza"><i class="fas fa-play"></i></button>
+        <button type="button" id="mpNext" title="Następny"><i class="fas fa-forward-step"></i></button>
+        <button type="button" id="mpClose" title="Zamknij"><i class="fas fa-xmark"></i></button>
+      </div>
+      <audio id="mpAudio" preload="metadata"></audio>
+    </div>
+  </aside>
+
+  <script src="{{ url_for('static', filename='js/turboconnect.js') }}"></script>
+</body>
+</html>
