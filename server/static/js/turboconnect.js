@@ -212,3 +212,178 @@ function initSpotifyForm() {
         const limit = parseInt(limitInput.value, 10) || 40;
         const save = saveInput && saveInput.checked ? "1" : "0";
 
+        clearConsole(`> IMPORT SPOTIFY: ${url}`);
+        addLog(`> limit=${limit}, zapis do biblioteki=${save === "1" ? "tak" : "nie"}`, "info");
+        addLog("Uruchamiam zadanie w tle...", "info");
+        setStatus("busy", "RUNNING...");
+        btn.disabled = true;
+
+        let jobId = null;
+        try {
+            const body = new FormData();
+            body.append("url", url);
+            body.append("limit", String(limit));
+            body.append("save", save);
+            const r = await fetch("/api/spotify_start", { method: "POST", body, cache: "no-store" });
+            if (!r.ok) {
+                const t = await r.text();
+                addLog(`BŁĄD HTTP ${r.status}: ${t || r.statusText}`, "err");
+                setStatus("err", "FAIL");
+                return;
+            }
+            const data = await r.json();
+            if (!data || !data.ok || !data.job_id) {
+                addLog(`BŁĄD: ${(data && data.error) || "nie udalo sie wystartowac"}`, "err");
+                setStatus("err", "FAIL");
+                return;
+            }
+            jobId = data.job_id;
+            addLog(`Job ID: ${jobId}`, "info");
+        } catch (err) {
+            addLog(`BŁĄD KOMUNIKACJI: ${err}`, "err");
+            setStatus("err", "FAIL");
+            return;
+        } finally {
+            btn.disabled = false;
+        }
+
+        await pollSpotifyJob(jobId);
+    });
+}
+
+function initBulkButtons() {
+    const all = document.getElementById("bulkAll");
+    const none = document.getElementById("bulkNone");
+    const form = document.getElementById("libForm");
+    if (!form) return;
+    const visible = () => Array.from(form.querySelectorAll('input[type="checkbox"][name="track_ids"]'))
+        .filter((b) => {
+            const row = b.closest(".track-row");
+            return !row || !row.classList.contains("hidden-by-filter");
+        });
+    if (all) all.addEventListener("click", () => visible().forEach((b) => (b.checked = true)));
+    if (none) none.addEventListener("click", () => visible().forEach((b) => (b.checked = false)));
+}
+
+/* =========================================
+   Live search w bibliotece (filtruje wiersze na biezaco).
+   ========================================= */
+function initLiveSearch() {
+    const input = document.getElementById("search-q");
+    const clearBtn = document.getElementById("searchClear");
+    const list = document.getElementById("trackList");
+    const counter = document.getElementById("searchCounter");
+    const empty = document.getElementById("emptyFilter");
+    if (!input || !list) return;
+
+    const rows = Array.from(list.querySelectorAll(".track-row"));
+    const total = rows.length;
+
+    const normalize = (s) => (s || "")
+        .toString()
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    function apply() {
+        const q = normalize(input.value.trim());
+        let shown = 0;
+        for (const row of rows) {
+            const hay = normalize(row.dataset.search || row.textContent);
+            const match = !q || hay.includes(q);
+            row.classList.toggle("hidden-by-filter", !match);
+            if (match) shown++;
+        }
+        if (counter) {
+            counter.textContent = q
+                ? `${shown} z ${total} pasuje do „${input.value.trim()}”`
+                : `Łącznie utworów: ${total}`;
+        }
+        if (empty) empty.hidden = shown > 0;
+    }
+
+    input.addEventListener("input", apply);
+    if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+            input.value = "";
+            apply();
+            input.focus();
+        });
+    }
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "/" && document.activeElement !== input
+            && !["INPUT", "TEXTAREA", "SELECT"].includes((document.activeElement || {}).tagName || "")) {
+            e.preventDefault();
+            input.focus();
+            input.select();
+        } else if (e.key === "Escape" && document.activeElement === input) {
+            input.value = "";
+            apply();
+            input.blur();
+        }
+    });
+
+    apply();
+}
+
+/* =========================================
+   Mini-player: klikasz play przy utworze, gra inline + kolejka.
+   ========================================= */
+function initMiniPlayer() {
+    const list = document.getElementById("trackList");
+    const mp = document.getElementById("miniPlayer");
+    const audio = document.getElementById("mpAudio");
+    const titleEl = document.getElementById("mpTitle");
+    const metaEl = document.getElementById("mpMeta");
+    const playBtn = document.getElementById("mpPlay");
+    const prevBtn = document.getElementById("mpPrev");
+    const nextBtn = document.getElementById("mpNext");
+    const closeBtn = document.getElementById("mpClose");
+    if (!list || !mp || !audio) return;
+
+    audio.controls = true;
+
+    const allRows = () => Array.from(list.querySelectorAll(".track-row"));
+    const visibleRows = () => allRows().filter((r) => !r.classList.contains("hidden-by-filter"));
+
+    let currentRow = null;
+
+    function show() {
+        mp.hidden = false;
+        document.body.classList.add("has-mp");
+    }
+    function setPlayingRow(row) {
+        for (const r of allRows()) r.classList.remove("playing");
+        if (row) row.classList.add("playing");
+        currentRow = row;
+    }
+    function setIcon(playing) {
+        const ic = playBtn.querySelector("i");
+        if (!ic) return;
+        ic.classList.toggle("fa-play", !playing);
+        ic.classList.toggle("fa-pause", playing);
+    }
+    function playRow(row) {
+        if (!row) return;
+        const url = row.dataset.streamUrl;
+        const title = row.dataset.title || "(bez tytulu)";
+        const filename = row.dataset.filename || "";
+        if (!url) return;
+        show();
+        setPlayingRow(row);
+        titleEl.textContent = title;
+        metaEl.textContent = filename;
+        audio.src = url;
+        audio.play().catch(() => { /* user gesture wymagany? nie - tu jest klik */ });
+    }
+    function neighbour(delta) {
+        const rows = visibleRows();
+        if (!rows.length) return null;
+        if (!currentRow) return rows[0];
+        let idx = rows.indexOf(currentRow);
+        if (idx < 0) return rows[0];
+        idx = (idx + delta + rows.length) % rows.length;
+        return rows[idx];
+    }
+
