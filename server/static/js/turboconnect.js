@@ -116,3 +116,99 @@ function triggerDownload(url) {
         setTimeout(() => a.remove(), 1000);
     } catch (_) {
         window.location.href = url;
+    }
+}
+
+function showZipReady(zipUrl, autoDownload) {
+    const { actions, downloadLink } = getConsole();
+    if (downloadLink) downloadLink.href = zipUrl;
+    if (actions) actions.hidden = false;
+    setStatus("done", "ZIP READY");
+    addLog(`Pobierz ZIP: ${zipUrl}`, "ok");
+    if (autoDownload) {
+        addLog("Pobieram automatycznie...", "info");
+        triggerDownload(zipUrl);
+    }
+}
+
+async function pollSpotifyJob(jobId) {
+    let since = 0;
+    let triedFallback = false;
+
+    while (true) {
+        let data;
+        try {
+            const r = await fetch(`/api/spotify_status/${encodeURIComponent(jobId)}?since=${since}`, { cache: "no-store" });
+            if (!r.ok) {
+                addLog(`BŁĄD HTTP ${r.status} przy odpytywaniu statusu`, "err");
+                setStatus("err", "FAIL");
+                return;
+            }
+            data = await r.json();
+        } catch (err) {
+            addLog(`BŁĄD KOMUNIKACJI: ${err}`, "err");
+            setStatus("err", "FAIL");
+            return;
+        }
+
+        if (!data || !data.ok) {
+            addLog(`BŁĄD: ${(data && data.error) || "nieznany"}`, "err");
+            setStatus("err", "FAIL");
+            return;
+        }
+
+        if (Array.isArray(data.logs)) {
+            for (const entry of data.logs) {
+                addLog(entry.t, entry.k || null);
+            }
+            since = data.logs_total || since + data.logs.length;
+        }
+
+        if (data.state === "done") {
+            if (data.zip_url) {
+                showZipReady(data.zip_url, true);
+            } else if (!triedFallback) {
+                triedFallback = true;
+                try {
+                    const fb = await fetch("/api/spotify_last_zip", { cache: "no-store" });
+                    if (fb.ok) {
+                        const fbd = await fb.json();
+                        if (fbd && fbd.ok && fbd.url) {
+                            showZipReady(fbd.url, true);
+                            return;
+                        }
+                    }
+                } catch (_) {}
+                setStatus("err", "DONE WITHOUT ZIP");
+                addLog("Zadanie zakonczone, ale brak ZIP-a.", "err");
+            }
+            return;
+        }
+
+        if (data.state === "error") {
+            setStatus("err", "FAIL");
+            return;
+        }
+
+        await new Promise((r) => setTimeout(r, 1200));
+    }
+}
+
+function initSpotifyForm() {
+    const form = document.getElementById("spotifyForm");
+    if (!form) return;
+    const urlInput = form.querySelector('input[name="url"]');
+    const limitInput = form.querySelector('input[name="limit"]');
+    const saveInput = form.querySelector('input[name="save"]');
+    const btn = form.querySelector("button[type=submit]");
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const url = (urlInput.value || "").trim();
+        if (!url) {
+            urlInput.focus();
+            return;
+        }
+        const limit = parseInt(limitInput.value, 10) || 40;
+        const save = saveInput && saveInput.checked ? "1" : "0";
+
