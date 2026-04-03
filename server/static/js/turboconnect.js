@@ -387,3 +387,102 @@ function initMiniPlayer() {
         return rows[idx];
     }
 
+    list.addEventListener("click", (e) => {
+        const btn = e.target.closest(".track-play-btn");
+        if (!btn) return;
+        const row = btn.closest(".track-row");
+        if (!row) return;
+        if (row === currentRow && !audio.paused) {
+            audio.pause();
+        } else if (row === currentRow && audio.paused && audio.src) {
+            audio.play().catch(() => {});
+        } else {
+            playRow(row);
+        }
+    });
+
+    playBtn.addEventListener("click", () => {
+        if (!currentRow) {
+            playRow(visibleRows()[0]);
+            return;
+        }
+        if (audio.paused) audio.play().catch(() => {});
+        else audio.pause();
+    });
+    prevBtn.addEventListener("click", () => playRow(neighbour(-1)));
+    nextBtn.addEventListener("click", () => playRow(neighbour(1)));
+    closeBtn.addEventListener("click", () => {
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+        mp.hidden = true;
+        document.body.classList.remove("has-mp");
+        setPlayingRow(null);
+    });
+
+    audio.addEventListener("play", () => setIcon(true));
+    audio.addEventListener("pause", () => setIcon(false));
+    audio.addEventListener("ended", () => {
+        const nxt = neighbour(1);
+        if (nxt && nxt !== currentRow) playRow(nxt);
+    });
+
+    document.addEventListener("keydown", (e) => {
+        const inField = ["INPUT", "TEXTAREA", "SELECT"].includes((document.activeElement || {}).tagName || "");
+        if (inField) return;
+        if (e.code === "Space") {
+            if (!currentRow && !audio.src) return;
+            e.preventDefault();
+            if (audio.paused) audio.play().catch(() => {});
+            else audio.pause();
+        } else if (e.key === "n") {
+            playRow(neighbour(1));
+        } else if (e.key === "p") {
+            playRow(neighbour(-1));
+        }
+    });
+}
+
+/* =========================================
+   Rozwijacz "NARZĘDZIA" - chowa pobieranie / spotify / konsole / playlisty.
+   ========================================= */
+function initToolsToggle() {
+    const btn = document.getElementById("toolsToggle");
+    const area = document.getElementById("toolsArea");
+    if (!btn || !area) return;
+
+    function setOpen(open, opts) {
+        opts = opts || {};
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        area.setAttribute("aria-hidden", open ? "false" : "true");
+        area.classList.toggle("is-open", open);
+        if (open && opts.scroll) {
+            requestAnimationFrame(() => {
+                area.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        }
+    }
+
+    btn.addEventListener("click", () => {
+        const isOpen = btn.getAttribute("aria-expanded") === "true";
+        setOpen(!isOpen);
+    });
+
+    // Linki / przyciski oznaczone [data-tools-open] automatycznie otwieraja sekcje.
+    document.querySelectorAll("[data-tools-open]").forEach((el) => {
+        el.addEventListener("click", () => setOpen(true, { scroll: true }));
+    });
+
+    // Submit w formularzach wewnątrz - nawet jak ktoś klikie hotlinkiem, otwiera.
+    ["fetchForm", "spotifyForm"].forEach((id) => {
+        const form = document.getElementById(id);
+        if (!form) return;
+        form.addEventListener("submit", () => setOpen(true));
+    });
+
+    // Jak URL ma hash do schowanej sekcji (np. #tc-spotify) - rozwin po wejsciu.
+    const hash = (location.hash || "").toLowerCase();
+    if (["#tc-fetch", "#tc-spotify"].includes(hash)) {
+        setOpen(true, { scroll: true });
+    }
+}
