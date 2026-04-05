@@ -195,3 +195,115 @@ body {
 .tech-brand { display: flex; align-items: center; gap: 15px; text-decoration: none; }
 
 .brand-icon-box {
+    width: 40px; height: 40px;
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--primary);
+    font-size: 1.2rem;
+    transform: skewX(-15deg);
+}
+
+.brand-text { display: flex; flex-direction: column; font-family: var(--font-tech); }
+.brand-title { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: 1px; line-height: 1; }
+.brand-subtitle { font-size: 0.65rem; color: var(--secondary); letter-spacing: 2px; font-family: var(--font-mono); }
+
+.tech-menu { display: flex; gap: 30px; height: 100%; align-items: center; }
+
+.nav-link {
+    color: #aabcdf; text-decoration: none; font-family: var(--font-mono);
+    font-size: 0.9rem; font-weight: 600; letter-spacing: 1px;
+    position: relative; transition: 0.3s; padding: 5px 10px;
+}
+
+.link-bracket { opacity: 0; color: var(--primary); transition: 0.3s; display: inline-block; transform: translateX(0); }
+
+.nav-link:hover { color: white; text-shadow: 0 0 8px var(--primary); }
+.nav-link:hover .link-bracket:first-child { opacity: 1; transform: translateX(-5px); }
+.nav-link:hover .link-bracket:last-child { opacity: 1; transform: translateX(5px); }
+.nav-link.active { color: var(--primary); }
+.nav-link.active .link-bracket { opacity: 1; }
+
+.nav-widgets { display: flex; align-items: center; gap: 20px; }
+.system-status {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid rgba(77, 141, 255, 0.3);
+    padding: 5px 12px; background: rgba(0,0,0,0.3);
+    font-family: var(--font-mono); font-size: 0.75rem; color: var(--secondary);
+}
+
+.status-indicator {
+    width: 8px; height: 8px; background: #00ff41;
+    border-radius: 50%; box-shadow: 0 0 8px #00ff41;
+    animation: blinkStatus 2s infinite;
+}
+@keyframes blinkStatus { 50% { opacity: 0.4; } }
+
+.mobile-toggle {
+    display: none; background: transparent; border: 1px solid var(--primary);
+    color: var(--primary); padding: 8px 12px; cursor: pointer;
+    font-size: 1.2rem; transition: 0.3s;
+}
+.mobile-toggle:hover { background: var(--primary); color: #000; }
+
+/* --- SEKCJA HERO --- */
+.hero { min-height: 100vh; display: flex; align-items: center; padding-top: 100px; overflow: hidden; position: relative; z-index: 2; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; position: relative; }
+.hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+
+.status-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(0, 240, 255, 0.1); border: 1px solid var(--primary);
+    padding: 5px 12px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--primary);
+    margin-bottom: 1rem;
+}
+.status-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 8px var(--primary); }
+
+h1 { font-size: 3.5rem; line-height: 1.1; margin-bottom: 1.5rem; text-transform: uppercase; }
+.hero-desc { font-size: 1.1rem; color: #aabcdf; margin-bottom: 2rem; max-width: 500px; line-height: 1.6; }
+
+.hero-btns { display: flex; gap: 15px; }
+.btn {
+    padding: 12px 30px; border: none; font-family: var(--font-mono); font-weight: bold;
+    text-transform: uppercase; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 10px;
+    transition: 0.3s; clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
+}
+.btn-primary { background: var(--primary); color: #000; box-shadow: 0 0 20px rgba(0,240,255,0.4); }
+.btn-primary:hover { background: white; transform: translateY(-3px); }
+.btn-outline { background: transparent; border: 1px solid var(--secondary); color: var(--secondary); }
+.btn-outline:hover { background: rgba(77, 141, 255, 0.2); }
+
+/* =========================================
+   WINGMAN - SAMOLOT W TLE (FIXED)
+   ========================================= */
+.main-plane {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 0; /* Tło */
+    pointer-events: none; /* Klikamy przez niego */
+    display: flex; justify-content: center; align-items: center;
+}
+
+.fighter-img {
+    width: 500px;
+    height: auto;
+
+    /* Zwiększamy widoczność (opacity), żeby wyglądał jak na początku */
+    opacity: 0.8; /* Było 0.15, dajemy 0.8 żeby był wyraźny */
+
+    /* Neonowy filtr */
+    filter: invert(1) drop-shadow(0 0 15px rgba(0, 238, 255, 0.233));
+
+    will-change: transform;
+}
+/* =========================================
+   ELEMENTY WIZUALNE I OKIENKA
+   ========================================= */
+.hero-visual { position: relative; height: 500px; display: flex; justify-content: center; align-items: center; }
+.visual-container { position: relative; width: 600px; height: 400px; }
+
+.floating-item {
+    position: absolute;
+    background: rgba(11, 16, 38, 0.9);
+    border: 1px solid rgba(77, 141, 255, 0.3);
