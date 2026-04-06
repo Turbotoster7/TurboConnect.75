@@ -510,3 +510,188 @@ input:focus, textarea:focus { outline: none; border-color: var(--primary); backg
 .bottom-right { bottom: 0; right: 0; border-left: none; border-top: none; }
 
 .profile-frame:hover .hud-corner { width: 30px; height: 30px; box-shadow: 0 0 10px var(--primary); }
+
+/* Linia skanująca (radar) */
+.scan-line {
+    position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+    background: var(--primary);
+    box-shadow: 0 0 10px var(--primary);
+    opacity: 0.5;
+    animation: scanProfile 3s linear infinite;
+}
+
+@keyframes scanProfile {
+    0% { top: 0%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+}
+
+/* --- STATYSTYKI BIOMETRYCZNE --- */
+.bio-stats {
+    display: flex; flex-direction: column; gap: 5px;
+    font-family: var(--font-mono); font-size: 0.8rem;
+    color: var(--secondary);
+}
+.bio-row {
+    display: flex; justify-content: space-between;
+    border-bottom: 1px dashed rgba(77, 141, 255, 0.3);
+    padding-bottom: 2px;
+}
+.val { color: var(--primary); font-weight: bold; }
+
+
+/* --- TREŚĆ OPISU --- */
+.text-panel {
+    background: rgba(11, 16, 38, 0.527) !important;
+    box-shadow: 0 10px 30px rgba(0, 82, 82, 0.158) !important;
+    backdrop-filter: blur(15px);
+}
+
+.text-panel h3 {
+    color: var(--primary); margin-bottom: 1.5rem;
+    font-family: var(--font-mono); border-left: 3px solid var(--primary);
+    padding-left: 10px;
+}
+
+.text-panel p {
+    margin-bottom: 1rem; color: #ccc; line-height: 1.6;
+}
+
+.skill-list {
+    list-style: none; margin: 1.5rem 0;
+}
+.skill-list li {
+    margin-bottom: 10px; display: flex; align-items: center; gap: 10px;
+    color: #e0f7ff;
+}
+.skill-list i { color: var(--accent); }
+
+
+/* --- PRZYCISK CV (GLITCH BUTTON) --- */
+.cv-action { margin-top: 2rem; }
+
+.btn-cv {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: space-between;
+    padding: 15px 30px;
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    text-decoration: none; font-weight: bold; font-family: var(--font-mono);
+    text-transform: uppercase; letter-spacing: 2px;
+    overflow: hidden;
+    transition: 0.3s;
+    width: 100%; max-width: 300px;
+}
+
+.btn-cv:hover {
+    background: var(--primary);
+    color: #0b1026;
+    box-shadow: 0 0 20px var(--primary);
+}
+
+.btn-icon { margin-left: 15px; font-size: 1.2rem; }
+
+/* Animacja paska przechodzącego przez przycisk */
+.btn-glitch {
+    position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transform: skewX(-20deg);
+    transition: 0.5s;
+}
+
+.btn-cv:hover .btn-glitch { left: 150%; transition: 0.5s; }
+
+
+/* --- RESPONSYWNOŚĆ --- */
+@media (max-width: 900px) {
+    .about-grid { grid-template-columns: 1fr; }
+    .about-visual { max-width: 300px; margin: 0 auto; }
+}
+
+/* =========================================
+   PROJEKTY: KARTY TAKTYCZNE HUD (POPRAWIONE)
+   ========================================= */
+
+.projects-grid {
+    display: grid;
+    /* Karty będą miały min. 280px, ale nie rozciągną się w nieskończoność */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 350px));
+    gap: 2rem;
+    justify-content: center; /* Wyśrodkowanie kart na ekranie */
+}
+
+.project-card {
+    position: relative;
+    background: linear-gradient(135deg, rgba(11, 16, 38, 0.9) 0%, rgba(16, 33, 65, 0.8) 100%);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    /* Ścięte rogi - militarny wygląd */
+    clip-path: polygon(
+        20px 0, 100% 0,
+        100% calc(100% - 20px), calc(100% - 20px) 100%,
+        0 100%, 0 20px
+    );
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 280px; /* Stała minimalna wysokość */
+}
+
+/* Efekt poświaty ramki przy hover */
+.project-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 240, 255, 0.15);
+}
+
+/* Pasek skanujący (animacja przy hover) */
+.project-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.1), transparent);
+    transform: skewX(-25deg);
+    transition: 0.5s;
+    pointer-events: none;
+}
+.project-card:hover::after {
+    left: 200%;
+    transition: 0.5s;
+}
+
+/* --- NAGŁÓWEK KARTY --- */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed rgba(77, 141, 255, 0.3);
+    padding-bottom: 10px;
+}
+
+.card-icon {
+    font-size: 1.5rem;
+    color: var(--primary);
+    background: rgba(0, 240, 255, 0.1);
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; /* Lekko zaokrąglone */
+}
+
+.card-meta {
+    text-align: right;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+}
+
+.status {
+    display: block;
+    font-weight: bold;
+    margin-top: 2px;
+    padding: 2px 6px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 2px;
