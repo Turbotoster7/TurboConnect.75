@@ -918,3 +918,119 @@ input:focus, textarea:focus { outline: none; border-color: var(--primary); backg
 }
 .input-group input:focus ~ .input-line,
 .input-group textarea:focus ~ .input-line {
+    width: 100%;
+}
+
+/* PRZYCISK NADAWANIA */
+.btn-transmit {
+    margin-top: 10px;
+    background: var(--primary); border: none;
+    padding: 15px; cursor: pointer; position: relative; overflow: hidden;
+    font-family: var(--font-tech); font-weight: bold; letter-spacing: 2px;
+    color: #0b1026; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transition: 0.3s;
+}
+
+.btn-transmit:hover {
+    background: white;
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px var(--primary);
+}
+
+.btn-content { position: relative; z-index: 2; display: flex; justify-content: center; gap: 10px; }
+
+
+/* RESPONSYWNOŚĆ */
+@media (max-width: 768px) {
+    .terminal-body { grid-template-columns: 1fr; }
+    .coordinates { flex-direction: row; flex-wrap: wrap; gap: 15px; }
+}
+
+/* =========================================
+   WIDGET RADARU (DO SEKCJI KONTAKT)
+   ========================================= */
+
+.radar-box {
+    margin: 20px 0;
+    display: flex; flex-direction: column; align-items: center;
+}
+
+.radar-scope {
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    position: relative;
+    overflow: hidden;
+    background-color: rgba(5, 10, 20, 0.8);
+    /* Siatka radaru (okręgi i linie) robiona gradientami */
+    background-image:
+        /* Koncentryczne okręgi */
+        radial-gradient(circle at center, transparent 30%, rgba(0,240,255,0.3) 30%, transparent 32%, transparent 60%, rgba(0,240,255,0.3) 60%, transparent 62%),
+        /* Linie krzyżowe */
+        linear-gradient(0deg, transparent 49%, rgba(0,240,255,0.3) 50%, transparent 51%),
+        linear-gradient(90deg, transparent 49%, rgba(0,240,255,0.3) 50%, transparent 51%);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2) inset;
+}
+
+/* Środek radaru */
+.radar-center {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 6px; height: 6px; background: var(--primary); border-radius: 50%;
+    box-shadow: 0 0 10px var(--primary);
+}
+
+/* Obracający się skaner */
+.radar-sweep {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 50%;
+    /* Gradient stożkowy tworzy efekt "wachlarza" światła */
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(0,240,255,0.5) 40deg, transparent 60deg);
+    animation: radarSpin 4s linear infinite;
+    transform-origin: center;
+}
+
+.radar-scope .radar-sweep {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(0,240,255,0.5) 40deg, transparent 60deg);
+    animation: radarSpin 4s linear infinite;
+}
+
+/* Cele (Blipy) na radarze */
+.radar-blip {
+    position: absolute; width: 8px; height: 8px;
+    background: var(--accent); border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent), 0 0 20px var(--accent);
+    opacity: 0;
+    /* Miganie zsynchronizowane z obrotem */
+    animation: blipFade 4s infinite;
+}
+
+/* Pozycje celów */
+.blip-1 { top: 30%; left: 65%; animation-delay: 0.8s; }
+.blip-2 { top: 75%; left: 40%; animation-delay: 2.2s; }
+
+.radar-label {
+    margin-top: 10px; font-family: var(--font-mono); font-size: 0.7rem;
+    color: var(--primary); letter-spacing: 1px;
+    animation: blinkText 2s infinite;
+}
+
+/* Animacje */
+@keyframes radarSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes blipFade {
+    0% { opacity: 0; scale: 0.5; }
+    20% { opacity: 1; scale: 1.2; } /* Pojawienie się */
+    40% { opacity: 0; scale: 1; }    /* Zanikanie po przejściu skanera */
+    100% { opacity: 0; }
+}
+
+@keyframes blinkText { 50% { opacity: 0.5; } }
+
+/* Dostosowanie responsywne */
+@media (max-width: 768px) {
