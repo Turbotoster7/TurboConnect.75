@@ -806,3 +806,115 @@ input:focus, textarea:focus { outline: none; border-color: var(--primary); backg
     background: rgba(0,0,0,0.4);
     backdrop-filter: blur(3px);
     z-index: 10;
+    color: #ff3333;
+    font-family: var(--font-mono);
+    text-align: center;
+    border: 1px solid #ff3333;
+    margin: 10px; /* Ramka wewnątrz */
+}
+
+.card-secret .secret-overlay i { font-size: 2rem; margin-bottom: 10px; }
+.card-secret:hover { transform: none; box-shadow: none; }
+
+/* =========================================
+   KONTAKT: TERMINAL TRANSMISJI (HUD STYLE)
+   ========================================= */
+.contact-terminal {
+    /* ZMIANA: Było 800px, teraz dajemy 100%, żeby pasowało do sekcji wyżej */
+    width: 100%;
+    max-width: 100%;
+
+    margin: 0 auto;
+    background: rgba(5, 10, 20, 0.95);
+    border: 1px solid var(--primary);
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+
+/* Dekoracyjne rogi */
+.contact-terminal::before, .contact-terminal::after {
+    content: ''; position: absolute; width: 20px; height: 20px;
+    border: 2px solid var(--primary); transition: 0.3s;
+}
+.contact-terminal::before { top: 0; left: 0; border-right: none; border-bottom: none; }
+.contact-terminal::after { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+/* --- HEADER TERMINALA --- */
+.terminal-header {
+    background: rgba(0, 240, 255, 0.1);
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--primary);
+    display: flex; justify-content: space-between; align-items: center;
+}
+
+.connection-status {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-mono); font-size: 0.75rem; color: var(--primary);
+    letter-spacing: 1px;
+}
+.status-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+
+/* Animacja słupków (Visualizer) */
+.frequency-visualizer { display: flex; gap: 3px; align-items: flex-end; height: 15px; }
+.bar { width: 4px; background: var(--secondary); animation: soundWave 1s infinite ease-in-out; }
+.bar:nth-child(1) { height: 40%; animation-delay: 0.1s; }
+.bar:nth-child(2) { height: 80%; animation-delay: 0.2s; }
+.bar:nth-child(3) { height: 60%; animation-delay: 0.3s; }
+.bar:nth-child(4) { height: 90%; animation-delay: 0.1s; }
+.bar:nth-child(5) { height: 50%; animation-delay: 0.4s; }
+
+@keyframes soundWave {
+    0%, 100% { height: 20%; opacity: 0.5; }
+    50% { height: 100%; opacity: 1; background: var(--primary); }
+}
+
+/* --- BODY --- */
+/* Dostosowanie układu wewnątrz dla szerokiego ekranu */
+.terminal-body {
+    padding: 3rem; /* Większy odstęp w środku */
+    display: grid;
+    grid-template-columns: 1fr 2fr; /* Więcej miejsca na formularz */
+    gap: 4rem; /* Większa przerwa między tekstem a polami */
+}
+
+/* LEWA STRONA (INFO) */
+.terminal-info h3 { color: white; margin-bottom: 1rem; font-size: 1.5rem; }
+.terminal-info p { color: #aabcdf; font-size: 0.9rem; line-height: 1.6; margin-bottom: 2rem; }
+
+.coordinates {
+    font-family: var(--font-mono); font-size: 0.7rem; color: var(--secondary);
+    display: flex; flex-direction: column; gap: 5px;
+    border-left: 2px solid var(--accent); padding-left: 10px;
+}
+
+/* PRAWA STRONA (FORMULARZ) */
+.cyber-form { display: flex; flex-direction: column; gap: 20px; }
+
+.input-group { position: relative; display: flex; flex-direction: column; }
+
+.input-group label {
+    font-family: var(--font-mono); font-size: 0.7rem; color: var(--primary);
+    margin-bottom: 5px; letter-spacing: 1px;
+}
+
+.input-group input, .input-group textarea {
+    background: rgba(255, 255, 255, 0.05);
+    border: none; border-bottom: 1px solid #333;
+    padding: 10px; color: white; font-family: var(--font-mono);
+    transition: 0.3s; resize: none;
+}
+
+.input-group input:focus, .input-group textarea:focus {
+    background: rgba(0, 240, 255, 0.1);
+    outline: none; border-bottom-color: var(--primary);
+}
+
+/* Animowana linia pod inputem */
+.input-line {
+    position: absolute; bottom: 0; left: 0; width: 0%; height: 2px;
+    background: var(--accent); transition: 0.4s;
+}
+.input-group input:focus ~ .input-line,
+.input-group textarea:focus ~ .input-line {
