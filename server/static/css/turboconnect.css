@@ -1457,3 +1457,120 @@ input:focus, textarea:focus { outline: none; border-color: var(--primary); backg
 /* --- Styl dla "Aktywnej Misji" (np. Studia lub Praca) --- */
 .timeline-item.active-mission .timeline-marker {
     border-color: var(--primary);
+    background: var(--primary);
+    box-shadow: 0 0 15px var(--primary);
+    animation: pulseMarker 2s infinite;
+}
+
+.timeline-item.active-mission .timeline-content {
+    border-left-color: var(--primary);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.05);
+}
+
+.status-tag {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 2px 8px;
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    background: rgba(0, 240, 255, 0.1);
+    animation: blinkText 3s infinite;
+}
+
+@keyframes pulseMarker {
+    0% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 240, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); }
+}
+
+/* Responsywność */
+@media (max-width: 768px) {
+    .timeline { margin-left: 0; }
+    .timeline-content { padding: 15px; }
+}
+
+/* =========================================
+   INTERAKTYWNA ŚCIEŻKA KARIERY (SAMOLOT)
+   =/* =========================================
+   HUD STACK + VERTICAL INDICATOR (CLEAN VERSION)
+/* =========================================
+   CAREER STREAM (CLEAN + NEON JET)
+   ========================================= */
+
+.career-section-stream {
+    padding: 100px 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.hud-layout-stream {
+    display: flex !important; /* Wymuszamy Flexbox */
+    align-items: stretch !important; /* Rozciągamy kolumny do równej wysokości */
+    justify-content: space-between;
+    gap: 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+}
+
+.stream-column {
+    flex: 1; /* Zajmuje całe dostępne miejsce */
+    width: 100%; /* Zabezpieczenie */
+}
+
+/* --- LEWA STRONA (LOGI) --- */
+.section-title-left {
+    font-size: 1.8rem; color: white; margin-bottom: 40px;
+    text-transform: uppercase; letter-spacing: 2px;
+    border-left: 4px solid var(--primary); padding-left: 15px;
+}
+
+.stream-container {
+    position: relative;
+    padding-left: 10px; /* Mniejszy padding, bo nie ma paska */
+}
+
+/* Pojedynczy wpis */
+.stream-node {
+    position: relative;
+    margin-bottom: 60px;
+    padding-left: 70px; /* Miejsce na kropkę */
+    opacity: 0.5;
+    transition: all 0.5s ease;
+}
+
+.stream-node:last-child { margin-bottom: 0; }
+.stream-node.scanned { opacity: 1; }
+
+/* Kropka / Marker (Bez linii) */
+.node-marker {
+    position: absolute;
+    left: 0; top: 0;
+    width: 50px; height: 50px;
+    display: flex; justify-content: center; align-items: center;
+    z-index: 2;
+}
+
+.core-dot {
+    width: 10px; height: 10px;
+    background: #0b1026;
+    border: 2px solid var(--secondary);
+    border-radius: 50%;
+    transition: 0.3s;
+    z-index: 3;
+}
+
+
+.stream-node.scanned .orbital-rings {
+    opacity: 1; transform: scale(1) rotate(180deg);
+}
+
+/* Treść wpisu */
+.node-content {
+    background: rgba(11, 16, 38, 0.6);
+    border: 1px solid rgba(77, 141, 255, 0.2);
+    padding: 25px;
+    border-radius: 6px;
+    backdrop-filter: blur(5px);
