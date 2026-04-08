@@ -1688,3 +1688,115 @@ input:focus, textarea:focus { outline: none; border-color: var(--primary); backg
         flex-direction: column;
         gap: 30px;
     }
+
+    /* Ustawienia dla Radaru */
+    .hud-panel.radar-panel {
+        /* order: -1 sprawia, że ten element ZAWSZE wskakuje na pierwsze miejsce */
+        order: -1;
+
+        /* Rozciągnij radar na całą szerokość telefonu */
+        width: 100%;
+        max-width: 100%;
+
+        /* Opcjonalnie: wyśrodkuj zawartość radaru */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* Ustawienia dla Formularza */
+    .hud-panel.form-panel {
+        order: 2; /* Formularz idzie pod spód */
+        width: 100%;
+    }
+
+    /* Poprawka dla wnętrza radaru na mobile, żeby się nie rozjeżdżało */
+    .panel-body.flex-body {
+        width: 100%;
+        align-items: center;
+    }
+
+    .radar-section {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+.system-logs .log-line {
+    animation: simpleFade 0.3s ease-out forwards;
+}
+
+@keyframes simpleFade {
+    from { opacity: 0; transform: translateX(-5px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* =========================================
+   Turboconnect — wlasny layout panelu www
+   ========================================= */
+
+.highlight {
+    color: var(--primary);
+    text-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
+}
+
+body.tc-app {
+    overflow-x: hidden;
+    padding-bottom: 0;
+}
+body.tc-app .main-plane,
+body.tc-app .loader-screen { display: none !important; }
+
+.tc-main {
+    padding-top: 110px;
+    padding-bottom: 4rem;
+    position: relative;
+    z-index: 2;
+}
+
+.tc-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* Karty / sekcje */
+.tc-hero-card .panel-content {
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+.tc-hero-text {
+    color: #aabcdf;
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+    font-size: 0.98rem;
+}
+.tc-hero-text strong { color: var(--primary); }
+
+.tc-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+}
+.tc-grid-2 .hud-panel { margin: 0; }
+.tc-grid-2 .panel-content { padding: 1rem 1.25rem 1.25rem; }
+
+/* Formularze */
+.tc-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.tc-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--secondary);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
