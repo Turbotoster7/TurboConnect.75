@@ -1800,3 +1800,110 @@ body.tc-app .loader-screen { display: none !important; }
     letter-spacing: 1px;
     text-transform: uppercase;
 }
+.tc-app input[type="text"],
+.tc-app input[type="number"],
+.tc-app input[type="email"],
+.tc-app textarea,
+.tc-app select {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(77, 141, 255, 0.35);
+    padding: 12px 14px;
+    color: #ffffff;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    border-radius: 4px;
+    transition: 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+}
+.tc-app input::placeholder,
+.tc-app textarea::placeholder {
+    color: rgba(170, 188, 223, 0.5);
+}
+.tc-app input:focus,
+.tc-app textarea:focus,
+.tc-app select:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(0, 240, 255, 0.06);
+    box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.15);
+}
+
+.tc-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+.tc-input-row > input,
+.tc-input-row > select {
+    flex: 1 1 220px;
+    min-width: 0;
+}
+.tc-btn-inline {
+    width: auto !important;
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+    flex: 0 0 auto;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+.tc-btn-ghost {
+    background: rgba(0, 240, 255, 0.08) !important;
+    color: var(--primary) !important;
+    border: 1px solid rgba(0, 240, 255, 0.4) !important;
+}
+.tc-btn-ghost:hover {
+    background: rgba(0, 240, 255, 0.18) !important;
+    color: #fff !important;
+}
+
+.tc-hint {
+    color: rgba(170, 188, 223, 0.7);
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    margin-top: 4px;
+}
+.tc-hint a { color: var(--primary); text-decoration: none; }
+.tc-hint a:hover { text-decoration: underline; }
+
+.tc-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #cfd8e3;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.tc-checkbox input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--primary);
+}
+
+/* Konsola logów */
+.tc-console {
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(77, 141, 255, 0.25);
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: #cfd8e3;
+    border-radius: 4px;
+    max-height: 320px;
+    overflow-y: auto;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.tc-console .log-line { margin: 0; opacity: 0.95; }
+.tc-console .log-line.ok { color: #00ff90; }
+.tc-console .log-line.err { color: #ff6b6b; }
+.tc-console .log-line.info { color: var(--primary); }
+.tc-console-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 10px;
