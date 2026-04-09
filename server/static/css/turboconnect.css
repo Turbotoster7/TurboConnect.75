@@ -1907,3 +1907,112 @@ body.tc-app .loader-screen { display: none !important; }
     margin-top: 12px;
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
+}
+.tc-console-actions .btn-transmit { width: auto !important; padding: 10px 20px !important; }
+
+#consoleStatus.idle { color: rgba(170, 188, 223, 0.6); animation: none; }
+#consoleStatus.busy { color: var(--accent); }
+#consoleStatus.done { color: #00ff90; }
+#consoleStatus.err { color: #ff6b6b; }
+
+/* Playlisty list */
+.tc-playlist-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.tc-playlist-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(77, 141, 255, 0.2);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+}
+.tc-playlist-name { color: #ffffff; }
+.tc-playlist-count { color: var(--secondary); font-size: 0.75rem; }
+.tc-playlist-list a {
+    margin-left: auto;
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.tc-playlist-list a + a { margin-left: 12px; }
+.tc-playlist-list a:hover { text-decoration: underline; }
+.tc-playlist-list a.tc-link-danger { color: #ff6b6b; }
+
+/* Lista utworow */
+.tc-library-toolbar {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px dashed rgba(77, 141, 255, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.tc-bulk-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+.tc-bulk-btn {
+    background: transparent;
+    border: 1px solid rgba(77, 141, 255, 0.4);
+    color: #aabcdf;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.tc-bulk-btn:hover { color: #fff; border-color: var(--primary); }
+
+.track-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: min(60vh, 560px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+.track-row {
+    border-bottom: 1px dashed rgba(77, 141, 255, 0.22);
+    padding: 0.75rem 0.25rem;
+}
+.track-row:last-child { border-bottom: none; }
+.track-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.92rem;
+}
+.track-label input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--primary);
+    flex-shrink: 0;
+}
+.track-title { color: #ffffff; }
+.track-filename {
+    color: rgba(170, 188, 223, 0.7);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    margin: 6px 0 0 30px;
+}
