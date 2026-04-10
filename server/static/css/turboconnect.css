@@ -2016,3 +2016,97 @@ body.tc-app .loader-screen { display: none !important; }
     font-size: 0.72rem;
     margin: 6px 0 0 30px;
 }
+.track-actions {
+    margin: 8px 0 0 30px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.track-actions a {
+    color: var(--primary);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    padding: 4px 10px;
+    border-radius: 3px;
+    transition: 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.track-actions a:hover {
+    background: rgba(0, 240, 255, 0.15);
+    color: #fff;
+}
+
+.tc-footer-note {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: rgba(170, 188, 223, 0.5);
+    margin: 1.5rem 0 0;
+}
+
+/* Wewnetrzny player */
+.player-page .hero {
+    min-height: auto !important;
+    padding-top: 100px !important;
+    padding-bottom: 2rem !important;
+}
+.player-page audio { width: 100%; margin-top: 12px; }
+.player-page .main-plane,
+.player-page .loader-screen { display: none !important; }
+
+/* Mobile drobne poprawki */
+@media (max-width: 700px) {
+    .tc-main { padding-top: 90px; }
+    .tc-grid-2 { grid-template-columns: 1fr; }
+    .tc-input-row { flex-direction: column; }
+    .tc-input-row > input,
+    .tc-input-row > select { flex: 1 1 auto; width: 100%; }
+    .tc-btn-inline { width: 100% !important; }
+}
+
+/* User pill / logout */
+.tc-user-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 12px;
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    background: rgba(0, 240, 255, 0.08);
+    color: var(--primary);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    border-radius: 4px;
+    line-height: 1;
+}
+.tc-user-pill .tc-user-name {
+    color: #fff;
+    text-transform: uppercase;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tc-logout-link {
+    color: #ff6b6b;
+    text-decoration: none;
+    padding: 4px 6px;
+    border-left: 1px solid rgba(255, 107, 107, 0.4);
+    margin-left: 2px;
+    transition: 0.2s;
+}
+.tc-logout-link:hover {
+    color: #fff;
+    background: rgba(255, 107, 107, 0.2);
+    border-radius: 0 3px 3px 0;
+}
+@media (max-width: 1000px) {
+    .tc-user-pill .tc-user-name { display: none; }
+}
+
+/* Login page */
