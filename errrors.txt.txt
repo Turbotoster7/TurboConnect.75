@@ -1,0 +1,2 @@
+Creation Time	Description	Resource	Path	Location	Type
+1774523079782	Undefined symbol: 'class CMdaAudioPlayerUtility * CMdaAudioPlayerUtility::NewFilePlayerL(class TDesC16 const &, class MMdaAudioPlayerCallback &, int, enum TMdaPriorityPreference, class CMdaServer *) (?NewFilePlayerL@CMdaAudioPlayerUtility@@SAPAV1@ABVTDesC16@@AAVMMdaAudioPlayerCallback@@HW4TMdaPriorityPreference@@PAVCMdaServer@@@Z)'	Nokiaspotify		Unknown	C/C++ Problem
